@@ -43,19 +43,26 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 - **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
 - **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
 
-## Vercel Deployment
+## Replit Deployment
 
-The project is configured to deploy on Vercel:
+The project runs on Replit as two separate services:
 
-- **`vercel.json`** (root) — configures build command, output directory, and URL rewrites
-- **`api/index.ts`** (root) — Vercel serverless function that wraps the Express app; handles all `/api/*` requests
-- **Frontend build**: `pnpm --filter @workspace/e-recruitments run build` → outputs to `artifacts/e-recruitments/dist/public`
-- **Routing**: `/api/*` → serverless function; all other paths → static React SPA
+- **Frontend** (`@workspace/e-recruitments`): React + Vite SPA on port 5000 (webview)
+- **API Server** (`@workspace/api-server`): Express 5 on port 3000 (console)
 
-Required environment variables in Vercel dashboard:
-- `DATABASE_URL` — PostgreSQL connection string
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (if using Supabase auth)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anonymous key (if using Supabase auth)
+### Workflows
+- `Start application` — `PORT=5000 pnpm --filter @workspace/e-recruitments run dev`
+- `API Server` — `PORT=3000 pnpm --filter @workspace/api-server run dev`
+
+### Required Secrets (set in Replit Secrets tab)
+- `DATABASE_URL` — PostgreSQL connection string (auto-provisioned by Replit)
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL (optional, for Supabase auth)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anonymous key (optional, for Supabase auth)
+- `RESEND_API_KEY` — Resend email API key (optional, for email notifications)
+
+### Notes
+- The `vercel.json` and `api/index.ts` files remain but are not used in Replit
+- Frontend calls the API at `/api/*` which must be proxied or use full URL in production
 
 ## Root Scripts
 
