@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "E-RECRUITMENTS"
+version = "1.0.0"
+id = "artifacts/e-recruitments"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22681
+
+[services.development]
+run = "pnpm --filter @workspace/e-recruitments run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/e-recruitments", "run", "build" ]
+publicDir = "artifacts/e-recruitments/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22681"
+BASE_PATH = "/"

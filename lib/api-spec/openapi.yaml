@@ -1,0 +1,660 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: E-RECRUITMENTS API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: jobs
+    description: Job listing operations
+  - name: applications
+    description: Application operations
+  - name: organizations
+    description: Organization operations
+  - name: profiles
+    description: User profile operations
+  - name: admin
+    description: Admin operations
+  - name: email
+    description: Email notification operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [organizations]
+      summary: List all organizations
+      responses:
+        "200":
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Organization"
+    post:
+      operationId: createOrganization
+      tags: [organizations]
+      summary: Create an organization (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationRequest"
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all jobs
+      parameters:
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+        - name: sector
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create a job listing (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobRequest"
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a specific job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [applications]
+      summary: List applications (user sees own, admin sees all)
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+    post:
+      operationId: submitApplication
+      tags: [applications]
+      summary: Submit a job application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitApplicationRequest"
+      responses:
+        "201":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}:
+    get:
+      operationId: getApplication
+      tags: [applications]
+      summary: Get a specific application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Application details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}/status:
+    patch:
+      operationId: updateApplicationStatus
+      tags: [admin]
+      summary: Update application status (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStatusRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /profiles/{userId}:
+    get:
+      operationId: getProfile
+      tags: [profiles]
+      summary: Get user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      operationId: upsertProfile
+      tags: [profiles]
+      summary: Create or update user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertProfileRequest"
+      responses:
+        "200":
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /documents:
+    post:
+      operationId: uploadDocument
+      tags: [profiles]
+      summary: Record an uploaded document reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadDocumentRequest"
+      responses:
+        "201":
+          description: Document recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /documents/{userId}:
+    get:
+      operationId: listDocuments
+      tags: [profiles]
+      summary: List documents for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get admin dashboard statistics
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        logo_url:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [UN, NGO, INGO, Government, Other]
+        created_at:
+          type: string
+      required:
+        - id
+        - name
+        - type
+        - created_at
+
+    CreateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        logo_url:
+          type: string
+        website:
+          type: string
+        type:
+          type: string
+          enum: [UN, NGO, INGO, Government, Other]
+      required:
+        - name
+        - type
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        organization_id:
+          type: string
+        organization:
+          $ref: "#/components/schemas/Organization"
+          nullable: true
+        sector:
+          type: string
+        location:
+          type: string
+        deadline:
+          type: string
+          nullable: true
+        employment_type:
+          type: string
+          enum: [Full-time, Part-time, Contract, Consultancy, Internship]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+      required:
+        - id
+        - title
+        - description
+        - organization_id
+        - sector
+        - location
+        - employment_type
+        - is_active
+        - created_at
+
+    CreateJobRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        organization_id:
+          type: string
+        sector:
+          type: string
+        location:
+          type: string
+        deadline:
+          type: string
+        employment_type:
+          type: string
+          enum: [Full-time, Part-time, Contract, Consultancy, Internship]
+      required:
+        - title
+        - description
+        - organization_id
+        - sector
+        - location
+        - employment_type
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        job_id:
+          type: string
+        job:
+          $ref: "#/components/schemas/Job"
+          nullable: true
+        cover_letter:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [Received, Under Review, Forwarded, Approved, Rejected]
+        submitted_at:
+          type: string
+        updated_at:
+          type: string
+        applicant_name:
+          type: string
+          nullable: true
+        applicant_email:
+          type: string
+          nullable: true
+      required:
+        - id
+        - user_id
+        - job_id
+        - status
+        - submitted_at
+        - updated_at
+
+    SubmitApplicationRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+        job_id:
+          type: string
+        cover_letter:
+          type: string
+        applicant_name:
+          type: string
+        applicant_email:
+          type: string
+      required:
+        - user_id
+        - job_id
+        - applicant_name
+        - applicant_email
+
+    UpdateStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Received, Under Review, Forwarded, Approved, Rejected]
+        applicant_email:
+          type: string
+        applicant_name:
+          type: string
+        job_title:
+          type: string
+      required:
+        - status
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        full_name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        nationality:
+          type: string
+          nullable: true
+        date_of_birth:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        linkedin_url:
+          type: string
+          nullable: true
+        education:
+          type: string
+          nullable: true
+        experience:
+          type: string
+          nullable: true
+        skills:
+          type: string
+          nullable: true
+        languages:
+          type: string
+          nullable: true
+        is_complete:
+          type: boolean
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+      required:
+        - id
+        - user_id
+        - is_complete
+        - created_at
+        - updated_at
+
+    UpsertProfileRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        nationality:
+          type: string
+        date_of_birth:
+          type: string
+        address:
+          type: string
+        bio:
+          type: string
+        linkedin_url:
+          type: string
+        education:
+          type: string
+        experience:
+          type: string
+        skills:
+          type: string
+        languages:
+          type: string
+        avatar_url:
+          type: string
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [CV, Certificate, Cover Letter, Other]
+        url:
+          type: string
+        size:
+          type: number
+          nullable: true
+        uploaded_at:
+          type: string
+      required:
+        - id
+        - user_id
+        - name
+        - type
+        - url
+        - uploaded_at
+
+    UploadDocumentRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [CV, Certificate, Cover Letter, Other]
+        url:
+          type: string
+        size:
+          type: number
+      required:
+        - user_id
+        - name
+        - type
+        - url
+
+    AdminStats:
+      type: object
+      properties:
+        total_applications:
+          type: number
+        total_jobs:
+          type: number
+        total_users:
+          type: number
+        total_organizations:
+          type: number
+        by_status:
+          type: object
+          additionalProperties:
+            type: number
+      required:
+        - total_applications
+        - total_jobs
+        - total_users
+        - total_organizations
+        - by_status

@@ -1,0 +1,8 @@
+node_modules
+.local
+attached_assets
+artifacts/api-server/dist
+artifacts/e-recruitments/dist
+artifacts/mockup-sandbox
+scripts
+*.log

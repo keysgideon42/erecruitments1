@@ -1,0 +1,21 @@
+packages:
+  "framer-motion": "For page transitions and polished UI animations"
+  "@supabase/supabase-js": "For authentication and document storage"
+  "react-hook-form": "For robust multi-step profile and application forms"
+  "@hookform/resolvers": "For Zod validation with react-hook-form"
+  "zod": "For client-side form validation"
+  "date-fns": "For formatting application and job deadlines"
+  "recharts": "For admin dashboard statistics visualization"
+
+images:
+  - path: "artifacts/e-recruitments/public/images/hero-bg.png"
+    description: "Professional abstract geometric background in deep blue and teal, representing a global network, clean and corporate UN/NGO style, soft lighting"
+    aspect_ratio: "16:9"
+  - path: "artifacts/e-recruitments/public/images/logo-icon.png"
+    description: "Minimalist flat vector icon of a globe integrated with a leaf or person, deep blue and emerald green, transparent background, professional NGO style"
+    aspect_ratio: "1:1"
+
+notes:
+  - "Requires Supabase bucket named 'documents' to be created manually or via migrations, with public read access and authenticated upload access."
+  - "Auth depends on NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY env variables. Uses email/password."
+  - "Users with email ending in @erecruitments.org are treated as admins on the client side."
