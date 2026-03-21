@@ -51,8 +51,20 @@ export function Jobs() {
               <SelectItem value="Health">Health</SelectItem>
               <SelectItem value="Education">Education</SelectItem>
               <SelectItem value="Protection">Protection</SelectItem>
-              <SelectItem value="Logistics">Logistics</SelectItem>
-              <SelectItem value="IT">IT & Tech</SelectItem>
+              <SelectItem value="WASH">WASH</SelectItem>
+              <SelectItem value="Nutrition">Nutrition</SelectItem>
+              <SelectItem value="Food Security">Food Security</SelectItem>
+              <SelectItem value="Logistics">Logistics & Supply Chain</SelectItem>
+              <SelectItem value="Finance">Finance & Admin</SelectItem>
+              <SelectItem value="Camp Management">Camp Management</SelectItem>
+              <SelectItem value="Shelter">Shelter & NFI</SelectItem>
+              <SelectItem value="Coordination">Coordination</SelectItem>
+              <SelectItem value="Communications">Communications & Media</SelectItem>
+              <SelectItem value="M&E">Monitoring & Evaluation</SelectItem>
+              <SelectItem value="HR">Human Resources</SelectItem>
+              <SelectItem value="Legal">Legal & Compliance</SelectItem>
+              <SelectItem value="IT">IT & Technology</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
             </SelectContent>
           </Select>
 

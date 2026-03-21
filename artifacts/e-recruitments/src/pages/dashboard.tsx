@@ -191,24 +191,27 @@ export function Dashboard() {
 
         <TabsContent value="documents">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card className="md:col-span-1 border-dashed border-2 border-slate-300 bg-slate-50 flex flex-col items-center justify-center p-8 text-center rounded-2xl relative overflow-hidden group">
-              {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}
-              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <UploadCloud className="w-8 h-8" />
-              </div>
-              <h3 className="font-semibold text-slate-900 mb-2">Upload Document</h3>
-              <p className="text-xs text-slate-500 mb-6">PDF, DOCX up to 5MB</p>
-              
-              <div className="relative">
-                <Button variant="outline" className="relative z-0">Choose File</Button>
-                <input 
-                  type="file" 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                  onChange={(e) => handleFileUpload(e, 'CV')}
-                  accept=".pdf,.doc,.docx"
-                />
-              </div>
-            </Card>
+            <div className="md:col-span-1 space-y-3">
+              {(['CV', 'Cover Letter', 'Certificate', 'Other'] as const).map((type) => (
+                <Card key={type} className="border-dashed border-2 border-slate-300 bg-slate-50 flex flex-col items-center justify-center p-5 text-center rounded-2xl relative overflow-hidden group hover:border-primary/40 transition-colors">
+                  {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>}
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <UploadCloud className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 text-sm mb-1">Upload {type}</h3>
+                  <p className="text-xs text-slate-500 mb-3">PDF, DOCX</p>
+                  <div className="relative">
+                    <Button variant="outline" size="sm" className="relative z-0 text-xs h-8">Choose File</Button>
+                    <input
+                      type="file"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      onChange={(e) => handleFileUpload(e, type)}
+                      accept=".pdf,.doc,.docx"
+                    />
+                  </div>
+                </Card>
+              ))}
+            </div>
 
             <div className="md:col-span-3 space-y-4">
               {docsLoading ? (
