@@ -15,6 +15,7 @@ import { ProfileForm } from "@/pages/profile-form";
 import { AdminDashboard } from "@/pages/admin";
 import { Organizations } from "@/pages/organizations";
 import { About, Contact, Privacy, Terms, Disclaimer } from "@/pages/info-pages";
+import { HowToApply } from "@/pages/how-to-apply";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,7 @@ function Router() {
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/organizations" component={Organizations} />
         
+        <Route path="/how-to-apply" component={HowToApply} />
         <Route path="/about" component={About} />
         <Route path="/contact" component={Contact} />
         <Route path="/privacy" component={Privacy} />

@@ -21,6 +21,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Home", path: "/" },
     { name: "Jobs", path: "/jobs" },
     { name: "Organizations", path: "/organizations" },
+    { name: "How to Apply", path: "/how-to-apply" },
     { name: "About", path: "/about" },
     { name: "Contact", path: "/contact" },
   ];
@@ -170,6 +171,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <ul className="space-y-3 text-sm">
               <li><Link href="/jobs" className="hover:text-white transition-colors">Browse Jobs</Link></li>
               <li><Link href="/organizations" className="hover:text-white transition-colors">Organizations</Link></li>
+              <li><Link href="/how-to-apply" className="hover:text-white transition-colors">How to Apply</Link></li>
               <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
