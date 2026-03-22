@@ -1,1409 +1,363 @@
 import { db } from "@workspace/db";
 import { organizationsTable, jobsTable } from "@workspace/db/schema";
+import { sql } from "drizzle-orm";
 
-const organizations = [
-  // ── UN AGENCIES ──────────────────────────────────────────────────────────
-  {
-    name: "UNHCR Kenya",
-    description:
-      "The UN Refugee Agency (UNHCR) works to protect and support refugees, asylum seekers, internally displaced and stateless people in Kenya. UNHCR Kenya operates in Nairobi, Kakuma, and Dadaab — the world's largest refugee complex — supporting over 500,000 persons of concern.",
-    logo_url: "https://logo.clearbit.com/unhcr.org",
-    website: "https://www.unhcr.org/ke/",
-    type: "UN",
-  },
-  {
-    name: "UNICEF Kenya",
-    description:
-      "UNICEF works to protect the rights of every child in Kenya. Our programmes focus on child survival and development, education, child protection, and policy advocacy. We partner with the Government of Kenya and civil society to reach the most vulnerable children across all 47 counties.",
-    logo_url: "https://logo.clearbit.com/unicef.org",
-    website: "https://www.unicef.org/kenya/",
-    type: "UN",
-  },
-  {
-    name: "WFP Kenya",
-    description:
-      "The World Food Programme (WFP) is the world's largest humanitarian organization fighting hunger. In Kenya, WFP tackles food insecurity and malnutrition, provides school meals, and supports government capacity building on social protection and disaster risk management.",
-    logo_url: "https://logo.clearbit.com/wfp.org",
-    website: "https://www.wfp.org/countries/kenya",
-    type: "UN",
-  },
-  {
-    name: "WHO Kenya",
-    description:
-      "The World Health Organization (WHO) works with the Government of Kenya to improve health outcomes, strengthen health systems, prepare for and respond to health emergencies, and address disease burdens including HIV/AIDS, malaria, tuberculosis, and non-communicable diseases.",
-    logo_url: "https://logo.clearbit.com/who.int",
-    website: "https://www.afro.who.int/countries/kenya",
-    type: "UN",
-  },
-  {
-    name: "IOM Kenya",
-    description:
-      "The International Organization for Migration (IOM) is committed to the principle that humane and orderly migration benefits migrants and society. In Kenya, IOM manages displacement monitoring, assists refugees and migrants, supports border management, and implements community stabilization programs.",
-    logo_url: "https://logo.clearbit.com/iom.int",
-    website: "https://kenya.iom.int/",
-    type: "UN",
-  },
-  {
-    name: "UNDP Kenya",
-    description:
-      "UNDP Kenya works to achieve the Sustainable Development Goals by helping Kenya reduce poverty, build democratic governance, rule of law, and inclusive institutions. Key focus areas include climate change, economic transformation, energy access, and resilience programming.",
-    logo_url: "https://logo.clearbit.com/undp.org",
-    website: "https://www.undp.org/kenya",
-    type: "UN",
-  },
-  {
-    name: "OCHA Kenya",
-    description:
-      "The UN Office for the Coordination of Humanitarian Affairs (OCHA) Kenya coordinates humanitarian response to ensure effective and principled assistance. OCHA facilitates information management, supports humanitarian leadership, and advocates for the needs of people affected by crises.",
-    logo_url: "https://logo.clearbit.com/unocha.org",
-    website: "https://www.unocha.org/kenya",
-    type: "UN",
-  },
-  {
-    name: "UN Women Kenya",
-    description:
-      "UN Women Kenya works to empower women and girls through gender equality programmes, policy advocacy, and coordination of UN system efforts. Focus areas include women's economic empowerment, leadership and participation, ending violence against women, and peace and security.",
-    logo_url: "https://logo.clearbit.com/unwomen.org",
-    website: "https://africa.unwomen.org/en/where-we-are/eastern-and-southern-africa/kenya",
-    type: "UN",
-  },
-  {
-    name: "FAO Kenya",
-    description:
-      "The Food and Agriculture Organization (FAO) Kenya supports sustainable agriculture, food security, and rural development. FAO provides technical assistance to the government and farmers, responds to food emergencies such as drought, and promotes climate-resilient agricultural practices.",
-    logo_url: "https://logo.clearbit.com/fao.org",
-    website: "https://www.fao.org/kenya/en/",
-    type: "UN",
-  },
-  {
-    name: "ILO Kenya",
-    description:
-      "The International Labour Organization (ILO) Kenya promotes rights at work, decent employment opportunities, social protection, and social dialogue. Key programmes focus on youth employment, skills development, labour standards, and supporting Kenya's transition to a formalized economy.",
-    logo_url: "https://logo.clearbit.com/ilo.org",
-    website: "https://www.ilo.org/africa/countries-covered/kenya/lang--en/index.htm",
-    type: "UN",
-  },
+// ── LOCATION POOLS BY REGION ─────────────────────────────────────────────────
+const LOC: Record<string, string[]> = {
+  "East Africa": ["Nairobi, Kenya", "Kampala, Uganda", "Addis Ababa, Ethiopia", "Dar es Salaam, Tanzania", "Kigali, Rwanda", "Juba, South Sudan", "Mogadishu, Somalia", "Djibouti City, Djibouti", "Kakuma, Kenya", "Dadaab, Kenya", "Bujumbura, Burundi"],
+  "West Africa": ["Dakar, Senegal", "Accra, Ghana", "Abuja, Nigeria", "Lagos, Nigeria", "Bamako, Mali", "Niamey, Niger", "Ouagadougou, Burkina Faso", "Abidjan, Côte d'Ivoire", "Freetown, Sierra Leone", "Monrovia, Liberia", "Conakry, Guinea"],
+  "Central Africa": ["N'Djamena, Chad", "Bangui, CAR", "Kinshasa, DRC", "Yaoundé, Cameroon", "Goma, DRC", "Maiduguri, Nigeria"],
+  "Southern Africa": ["Lusaka, Zambia", "Harare, Zimbabwe", "Maputo, Mozambique", "Lilongwe, Malawi", "Antananarivo, Madagascar", "Johannesburg, South Africa"],
+  "MENA": ["Amman, Jordan", "Beirut, Lebanon", "Istanbul, Turkey", "Cairo, Egypt", "Tunis, Tunisia", "Baghdad, Iraq", "Erbil, Iraq", "Gaza Strip, Palestine", "Ramallah, Palestine", "Sanaa, Yemen", "Aden, Yemen", "Tripoli, Libya"],
+  "South Asia": ["Dhaka, Bangladesh", "Kathmandu, Nepal", "Colombo, Sri Lanka", "New Delhi, India", "Islamabad, Pakistan", "Kabul, Afghanistan", "Karachi, Pakistan", "Peshawar, Pakistan"],
+  "Southeast Asia": ["Bangkok, Thailand", "Manila, Philippines", "Jakarta, Indonesia", "Yangon, Myanmar", "Vientiane, Laos", "Phnom Penh, Cambodia", "Kuala Lumpur, Malaysia"],
+  "Central Asia": ["Tashkent, Uzbekistan", "Bishkek, Kyrgyzstan", "Tbilisi, Georgia", "Kyiv, Ukraine", "Yerevan, Armenia", "Almaty, Kazakhstan"],
+  "Europe HQ": ["Geneva, Switzerland", "Brussels, Belgium", "Vienna, Austria", "London, United Kingdom", "Paris, France", "Berlin, Germany", "Rome, Italy", "Stockholm, Sweden", "Oslo, Norway"],
+  "Americas": ["Washington DC, USA", "New York, USA", "Panama City, Panama", "Bogotá, Colombia", "Port-au-Prince, Haiti", "Lima, Peru", "Guatemala City, Guatemala", "San José, Costa Rica"],
+  "Asia Pacific": ["Bangkok, Thailand", "Manila, Philippines", "Jakarta, Indonesia", "Sydney, Australia", "Suva, Fiji"],
+  "Global": ["Geneva, Switzerland", "New York, USA", "Nairobi, Kenya", "Brussels, Belgium", "Rome, Italy"],
+};
 
-  // ── NGOs ─────────────────────────────────────────────────────────────────
-  {
-    name: "Save the Children Kenya",
-    description:
-      "Save the Children has worked in Kenya since 1984. We fight for children's rights and deliver immediate and lasting improvement to their lives. Our work covers child protection, education in emergencies, health and nutrition, and livelihoods support for families.",
-    logo_url: "https://logo.clearbit.com/savethechildren.org",
-    website: "https://www.savethechildren.net/where-we-work/kenya",
-    type: "NGO",
-  },
-  {
-    name: "Oxfam Kenya",
-    description:
-      "Oxfam Kenya works to build a fairer world free from poverty. We run long-term programmes on food security, water and sanitation, gender justice, and emergency response. We also advocate for systemic change to tackle the root causes of poverty in Kenya.",
-    logo_url: "https://logo.clearbit.com/oxfam.org",
-    website: "https://www.oxfam.org/en/countries/kenya",
-    type: "NGO",
-  },
-  {
-    name: "MSF Kenya",
-    description:
-      "Médecins Sans Frontières (MSF) provides medical and humanitarian assistance to people in Kenya affected by armed conflicts, epidemics, disasters, or exclusion from healthcare. MSF operates in Nairobi, the coast, and arid and semi-arid regions providing life-saving medical care.",
-    logo_url: "https://logo.clearbit.com/msf.org",
-    website: "https://www.msf.org/kenya",
-    type: "NGO",
-  },
-  {
-    name: "IRC Kenya",
-    description:
-      "The International Rescue Committee (IRC) responds to some of the world's worst humanitarian crises in Kenya. Since 1992, IRC has been providing emergency relief and post-conflict reconstruction to refugees in Kakuma and host communities across Kenya.",
-    logo_url: "https://logo.clearbit.com/rescue.org",
-    website: "https://www.rescue.org/country/kenya",
-    type: "NGO",
-  },
-  {
-    name: "World Vision Kenya",
-    description:
-      "World Vision Kenya has been transforming communities for over 40 years through community development, advocacy, and emergency relief. We reach millions of the most vulnerable children through our Area Programmes across Kenya's 47 counties.",
-    logo_url: "https://logo.clearbit.com/worldvision.org",
-    website: "https://www.wvi.org/kenya",
-    type: "NGO",
-  },
-  {
-    name: "CARE International Kenya",
-    description:
-      "CARE International Kenya puts special focus on working with women and girls to bring lasting change to communities. Our programmes address food security, WASH, health, economic empowerment, and humanitarian response across Kenya.",
-    logo_url: "https://logo.clearbit.com/care.org",
-    website: "https://www.care.org/our-work/where-we-work/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Action Against Hunger Kenya",
-    description:
-      "Action Against Hunger (ACF) has been delivering lifesaving nutrition, health, WASH and food security programmes in Kenya since 1996, reaching the most vulnerable communities in Nairobi, Mandera, Wajir, Isiolo, Marsabit, and Turkana counties.",
-    logo_url: "https://logo.clearbit.com/actionagainsthunger.org",
-    website: "https://www.actionagainsthunger.org/country/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Norwegian Refugee Council Kenya",
-    description:
-      "The Norwegian Refugee Council (NRC) is an independent humanitarian organisation helping people forced to flee in Kenya. NRC provides assistance in shelter, education, legal protection, information and counselling services, and livelihoods to refugees and internally displaced people.",
-    logo_url: "https://logo.clearbit.com/nrc.no",
-    website: "https://www.nrc.no/countries/africa/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Danish Refugee Council Kenya",
-    description:
-      "The Danish Refugee Council (DRC) has been operating in Kenya since 1996. DRC provides protection, livelihoods, WASH, shelter, and food security assistance to refugees and host communities in Dadaab, Kakuma and Nairobi.",
-    logo_url: "https://logo.clearbit.com/drc.ngo",
-    website: "https://www.drc.ngo/where-we-work/east-africa/kenya",
-    type: "NGO",
-  },
-  {
-    name: "Mercy Corps Kenya",
-    description:
-      "Mercy Corps Kenya builds stronger communities by addressing the root causes of poverty and conflict. Our programmes focus on economic opportunities, climate resilience, food security, and market systems development across Kenya and the greater Horn of Africa region.",
-    logo_url: "https://logo.clearbit.com/mercycorps.org",
-    website: "https://www.mercycorps.org/where-we-work/kenya",
-    type: "NGO",
-  },
-  {
-    name: "Plan International Kenya",
-    description:
-      "Plan International Kenya has been working for children's rights and equality for girls since 1983. We focus on education, health, youth empowerment, and child protection, with a particular emphasis on ending child marriage and female genital mutilation.",
-    logo_url: "https://logo.clearbit.com/plan-international.org",
-    website: "https://plan-international.org/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "GOAL Kenya",
-    description:
-      "GOAL Kenya is an international humanitarian organisation working in Nairobi's informal settlements and Northern Kenya. Our programmes focus on urban health, nutrition, WASH, livelihoods, and responding to food crises and disease outbreaks.",
-    logo_url: "https://logo.clearbit.com/goal.ie",
-    website: "https://www.goal.ie/en-gb/countries/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Islamic Relief Kenya",
-    description:
-      "Islamic Relief Kenya has been providing emergency relief and development assistance since 1993. We work across Kenya on food security, WASH, education, livelihoods, and orphan sponsorship, serving all people regardless of race, religion, or gender.",
-    logo_url: "https://logo.clearbit.com/islamic-relief.org",
-    website: "https://www.islamic-relief.org/country/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Catholic Relief Services Kenya",
-    description:
-      "Catholic Relief Services (CRS) Kenya has been assisting Kenyans since 1965. CRS implements programmes in agriculture, health, emergency response, peacebuilding, and education, partnering with the Catholic Church and local organisations across Kenya.",
-    logo_url: "https://logo.clearbit.com/crs.org",
-    website: "https://www.crs.org/our-work-overseas/where-we-work/kenya",
-    type: "NGO",
-  },
-  {
-    name: "Tearfund Kenya",
-    description:
-      "Tearfund Kenya partners with local churches and organisations to tackle poverty and injustice. Our work covers disaster risk reduction, climate resilience, livelihoods, and mental health and psychosocial support for communities across Kenya.",
-    logo_url: "https://logo.clearbit.com/tearfund.org",
-    website: "https://www.tearfund.org/",
-    type: "NGO",
-  },
-  {
-    name: "AMREF Health Africa",
-    description:
-      "AMREF Health Africa is Africa's largest homegrown health NGO, founded in Kenya in 1957. We develop, test, and scale health solutions for communities across Kenya and the continent, focusing on health system strengthening, maternal and child health, and disease prevention.",
-    logo_url: "https://logo.clearbit.com/amref.org",
-    website: "https://amref.org/country/kenya/",
-    type: "NGO",
-  },
-  {
-    name: "Kenya Red Cross Society",
-    description:
-      "Kenya Red Cross Society (KRCS) is a leading humanitarian organisation established in 1965. KRCS responds to disasters and emergencies across Kenya, and runs long-term programmes on blood services, health, disaster risk reduction, and community resilience.",
-    logo_url: "https://logo.clearbit.com/redcross.or.ke",
-    website: "https://www.redcross.or.ke/",
-    type: "NGO",
-  },
-  {
-    name: "Concern Worldwide Kenya",
-    description:
-      "Concern Worldwide Kenya works with the most vulnerable communities to tackle poverty and humanitarian crises. Our programmes focus on nutrition, health, livelihoods, education, and emergency response in Marsabit, Samburu, Isiolo, Turkana, and urban Nairobi.",
-    logo_url: "https://logo.clearbit.com/concern.net",
-    website: "https://www.concern.net/where-we-work/africa/kenya",
-    type: "NGO",
-  },
-  {
-    name: "Africa Humanitarian Action",
-    description:
-      "Africa Humanitarian Action (AHA) is an African-led humanitarian organisation delivering health, nutrition, and emergency response programmes across the Horn of Africa and East Africa, including Kenya. AHA is committed to locally-led humanitarian action.",
-    logo_url: "https://logo.clearbit.com/africahumanitarianaction.org",
-    website: "https://www.africahumanitarianaction.org/",
-    type: "NGO",
-  },
-  {
-    name: "Welthungerhilfe Kenya",
-    description:
-      "Welthungerhilfe (German Agro Action) has been fighting hunger and poverty in Kenya since 1974. Programmes cover food security and agriculture, WASH, economic development, and disaster risk reduction in Kilifi, Kwale, Kitui, and the arid and semi-arid lands.",
-    logo_url: "https://logo.clearbit.com/welthungerhilfe.de",
-    website: "https://www.welthungerhilfe.org/projects-countries/countries/kenya/",
-    type: "NGO",
-  },
+// ── EMPLOYMENT TYPES ──────────────────────────────────────────────────────────
+const EMP = ["Full-time", "Full-time", "Full-time", "Full-time", "Contract", "Contract", "Consultant", "Internship"];
+
+// ── SECTORS & ROLES ───────────────────────────────────────────────────────────
+const ROLES: Record<string, string[]> = {
+  "Health": ["Medical Officer", "Health Programme Manager", "Epidemiologist", "Community Health Officer", "Mental Health and PSS Officer", "Maternal and Child Health Specialist", "Pharmacy Manager", "Public Health Officer", "Clinical Officer", "HIV/AIDS Programme Officer", "Tuberculosis Programme Coordinator", "Malaria Programme Officer", "Health Systems Strengthening Specialist", "Medical Coordinator", "Environmental Health Officer"],
+  "Protection": ["Protection Officer", "Child Protection Specialist", "GBV Programme Manager", "Legal Officer", "Community Protection Monitor", "SGBV Coordinator", "Case Management Officer", "Psychosocial Support Officer", "Protection Cluster Coordinator", "Human Rights Officer", "Refugee Status Determination Officer", "Durable Solutions Officer", "Protection Monitoring Officer", "Resettlement Officer", "Anti-Trafficking Programme Officer"],
+  "Nutrition": ["Nutrition Officer", "Community Nutrition Manager", "CMAM Coordinator", "IYCF Specialist", "Nutrition Surveillance Officer", "Emergency Nutrition Advisor", "Nutrition Programme Manager", "Stunting Prevention Specialist", "Nutrition Cluster Coordinator", "Infant and Young Child Feeding Officer"],
+  "Food Security": ["Food Security Analyst", "Livelihoods Officer", "Cash Transfer Programme Manager", "Market Systems Advisor", "Agricultural Development Officer", "Food Distribution Coordinator", "Pastoralist Livelihoods Specialist", "Value Chain Development Officer", "Food Security Cluster Coordinator", "Emergency Livelihoods Officer"],
+  "WASH": ["WASH Engineer", "Water Quality Officer", "Sanitation Specialist", "Hygiene Promotion Officer", "WASH Cluster Coordinator", "Borehole Drilling Supervisor", "Urban WASH Manager", "WASH Programme Manager", "WASH Technical Advisor", "Community Water Management Officer"],
+  "Education": ["Education Programme Officer", "Education in Emergencies Specialist", "Teacher Training Coordinator", "Education Cluster Coordinator", "Learning Assessments Specialist", "Inclusive Education Advisor", "Girls' Education Officer", "Early Childhood Development Specialist", "TVET Programme Officer", "Accelerated Education Officer"],
+  "Logistics": ["Supply Chain Manager", "Logistics Officer", "Fleet Manager", "Procurement Specialist", "Warehouse Manager", "Transport and Customs Officer", "Logistics Cluster Coordinator", "Humanitarian Supply Chain Advisor", "Import/Export Officer", "Procurement Officer"],
+  "Finance": ["Finance Manager", "Grants Management Officer", "Budget Analyst", "Internal Auditor", "Financial Controller", "Compliance Officer", "Finance and Administration Officer", "Treasury Officer", "Donor Reporting Officer", "Finance Officer"],
+  "M&E": ["Monitoring and Evaluation Officer", "Data Analyst", "MEAL Coordinator", "Impact Evaluation Specialist", "GIS Analyst", "Research Officer", "Information Management Officer", "Data Quality Assurance Officer", "Programme Quality Officer", "MEAL Manager"],
+  "Communications": ["Communications Officer", "Media Relations Specialist", "Digital Content Creator", "Advocacy Officer", "Public Information Officer", "Reporting Officer", "Fundraising Officer", "Social Media Manager", "Storytelling Officer", "Brand and Communications Manager"],
+  "HR": ["Human Resources Manager", "Talent Acquisition Specialist", "Learning and Development Officer", "HR Business Partner", "Payroll and Benefits Officer", "Organizational Development Specialist", "HR Officer", "Recruitment Officer", "Staff Welfare Officer", "HR Coordinator"],
+  "Legal": ["Legal Advisor", "Compliance Officer", "Contract Management Specialist", "Policy Analyst", "Legal Officer", "Ethics Officer", "International Law Specialist", "Data Protection Officer", "Labour Law Officer", "Legal and Policy Officer"],
+  "IT": ["IT Systems Administrator", "Database Manager", "ERP Specialist", "Cybersecurity Analyst", "Data Engineer", "Software Developer", "Digital Transformation Officer", "ICT4D Specialist", "Network Administrator", "IT Support Officer"],
+  "Coordination": ["Cluster Coordinator", "Humanitarian Affairs Officer", "Programme Coordinator", "Partnership Officer", "Inter-Agency Liaison Officer", "Field Coordinator", "Country Programme Coordinator", "Nexus Coordinator", "Crisis Coordinator", "Sub-Cluster Coordinator"],
+  "Camp Management": ["Camp Manager", "Camp Coordination Officer", "Site Improvement Officer", "Community Mobilization Officer", "Camp Management Coordinator", "Site Management Support Officer", "Displacement Tracking Officer", "Camp Services Officer"],
+  "Shelter": ["Shelter Engineer", "NFI Distribution Officer", "Housing Land and Property Officer", "Shelter Programme Manager", "Transitional Shelter Specialist", "Urban Shelter Advisor", "Construction Supervisor", "Shelter Cluster Coordinator"],
+  "Senior Leadership": ["Country Director", "Deputy Country Director", "Regional Director", "Chief of Party", "Programme Director", "Head of Office", "Head of Mission", "Area Manager", "Head of Sub-Office", "Deputy Head of Mission"],
+  "Other": ["Programme Officer", "Field Officer", "Operations Manager", "Administrative Officer", "Project Manager", "Research Analyst", "Community Development Officer", "Capacity Building Officer", "Gender Officer", "AAP Officer"],
+};
+
+// ── DESCRIPTION TEMPLATES BY SECTOR ──────────────────────────────────────────
+const DESC: Record<string, string[]> = {
+  "Health": [
+    `OVERVIEW\nThis position leads health service delivery programmes ensuring quality, equitable care for affected populations. The incumbent manages clinical teams, coordinates with health authorities, and drives compliance with international health standards and Ministry of Health protocols.\n\nKEY RESPONSIBILITIES\n• Plan, implement, and monitor primary and secondary healthcare services\n• Supervise clinical staff and provide technical mentorship\n• Coordinate with government health departments, WHO, and health cluster partners\n• Conduct disease surveillance and early warning system management\n• Ensure availability and rational use of essential medicines and medical supplies\n• Prepare donor progress reports, health data analysis, and situation reports\n• Support infection prevention and control (IPC) measures across health facilities\n\nREQUIRED QUALIFICATIONS\n• Medical degree or advanced qualification in Public Health (MPH or equivalent)\n• Minimum 3–5 years of experience in health programme management in humanitarian or development settings\n• Strong knowledge of primary health care delivery, HMIS, and health cluster coordination\n• Excellent leadership, communication, and analytical skills\n• Fluency in English; knowledge of French or Arabic an asset\n\nWHAT WE OFFER\n• Competitive salary and comprehensive benefits package\n• International exposure and professional development opportunities\n• Collaborative and mission-driven work environment`,
+
+    `OVERVIEW\nThe organization is seeking a dedicated health professional to manage integrated health programming including maternal and child health, communicable disease control, and emergency health response in challenging field environments.\n\nKEY RESPONSIBILITIES\n• Manage integrated health programmes including MCH, nutrition, and disease control\n• Build capacity of national health staff on clinical management protocols\n• Lead health assessments, rapid needs assessments, and outbreak investigations\n• Manage programme budget and ensure compliance with donor requirements\n• Coordinate with local health authorities, clusters, and implementing partners\n• Collect and analyse health data to inform adaptive programme management\n• Represent the organization in health sector working groups and coordination forums\n\nREQUIRED QUALIFICATIONS\n• Degree in Medicine, Nursing, or Public Health\n• At least 4 years of experience in health programming in development or emergency contexts\n• Knowledge of emergency health standards (Sphere, IASC) and WHO protocols\n• Strong team management and problem-solving skills\n• Willingness to work in remote and challenging field conditions\n\nWHAT WE OFFER\n• Competitive remuneration aligned with sector standards\n• R&R policy for field-based staff\n• Supportive team culture with focus on wellbeing`,
+
+    `OVERVIEW\nThis role coordinates health system strengthening interventions to improve the quality, coverage, and sustainability of health services. Working closely with national and county government partners, the incumbent will build institutional capacity and support health governance at all levels.\n\nKEY RESPONSIBILITIES\n• Support county health management teams on planning, budgeting, and implementation\n• Strengthen health management information systems (DHIS2) and data quality\n• Lead quality improvement initiatives across health facilities\n• Facilitate community health systems and community health volunteer networks\n• Coordinate health financing and resource mobilization efforts\n• Produce technical reports, policy briefs, and programme documentation\n• Represent the organization in inter-agency health system strengthening forums\n\nREQUIRED QUALIFICATIONS\n• Advanced degree in Public Health, Health Policy, or related field\n• Minimum 5 years of experience in health systems strengthening\n• Familiarity with devolved health systems and national health strategies\n• Expertise in DHIS2, health governance, and quality improvement methodologies\n• Excellent communication and stakeholder engagement skills\n\nWHAT WE OFFER\n• Salary commensurate with experience and sector standards\n• Flexible working arrangements where applicable\n• Commitment to staff professional development`,
+  ],
+
+  "Protection": [
+    `OVERVIEW\nThis position leads protection programming for displaced populations, ensuring that refugees, asylum seekers, internally displaced persons, and stateless people receive appropriate protection services, legal assistance, and psychosocial support.\n\nKEY RESPONSIBILITIES\n• Manage protection case management systems including registration and individual case file documentation\n• Supervise protection field staff, community protection monitors, and volunteers\n• Lead identification and referral of persons with specific needs (PSN)\n• Coordinate SGBV prevention and response programming with GBV sub-cluster partners\n• Facilitate community-based protection mechanisms and accountability to affected populations\n• Prepare protection analyses, situation reports, and donor progress reports\n• Represent the organization in protection cluster and sub-cluster coordination meetings\n\nREQUIRED QUALIFICATIONS\n• Degree in Law, Social Work, Human Rights, or related field\n• Minimum 4 years of experience in refugee protection or human rights work\n• Knowledge of international refugee law, SGBV standards, and case management\n• Strong leadership, supervision, and interpersonal skills\n• Fluency in English; knowledge of Arabic, Somali, or French an advantage\n\nWHAT WE OFFER\n• Competitive salary and benefits including health insurance\n• Career progression within a global protection network\n• Meaningful impact work supporting vulnerable communities`,
+
+    `OVERVIEW\nThe Child Protection Specialist leads programmes to prevent and respond to violence, abuse, neglect, and exploitation of children. The role involves managing case workers, strengthening child protection systems, and working with communities and government to build a protective environment for children.\n\nKEY RESPONSIBILITIES\n• Lead child protection case management, including UASC family tracing and reunification\n• Supervise child protection case workers and provide technical coaching\n• Design and implement community-based child protection mechanisms\n• Coordinate with education, health, and WASH teams on integrated programming\n• Support development of national child protection systems in partnership with government\n• Monitor child protection data and produce regular reports on programme outcomes\n• Ensure child safeguarding standards are upheld across all programme activities\n\nREQUIRED QUALIFICATIONS\n• Degree in Social Work, Child Development, Psychology, or related field\n• Minimum 3 years of experience in child protection programming\n• Knowledge of CPIMS+/Primero or equivalent case management systems\n• Experience with UASC, GBV survivors, and children in alternative care\n• Good facilitation, training, and communication skills\n\nWHAT WE OFFER\n• Competitive salary and staff wellbeing programme\n• International exposure and peer learning opportunities\n• Commitment to child rights and safeguarding`,
+  ],
+
+  "Nutrition": [
+    `OVERVIEW\nThe Nutrition Officer manages community-based management of acute malnutrition (CMAM) and maternal and infant nutrition programming for vulnerable populations including children under five and pregnant and lactating women.\n\nKEY RESPONSIBILITIES\n• Implement and monitor CMAM programmes (OTP, TSFP, Stabilisation Centre linkages)\n• Train and supervise community health workers on MUAC screening and referral\n• Conduct nutrition surveillance, SMART surveys, and programme evaluations\n• Manage therapeutic food supply pipeline and ensure timely delivery to programme sites\n• Coordinate with Ministry of Health, UNICEF, and nutrition sub-sector partners\n• Implement IYCF-E counselling and behaviour change communication activities\n• Prepare programme reports, donor updates, and lessons learned documentation\n\nREQUIRED QUALIFICATIONS\n• Degree in Nutrition, Dietetics, or Public Health\n• At least 3 years of experience in CMAM programming\n• Knowledge of Sphere nutrition standards, SMART methodology, and ENA software\n• Strong supervisory and community mobilization skills\n• Willingness to travel frequently to field sites\n\nWHAT WE OFFER\n• Competitive NGO/UN salary scale with full benefits\n• Field experience in priority nutrition response countries\n• Professional development in nutrition-focused career path`,
+
+    `OVERVIEW\nThis role leads strategic nutrition programming including stunting prevention, multi-sector nutrition integration, and emergency nutrition response. The Nutrition Manager will coordinate with government, clusters, and technical partners to deliver high-quality, evidence-based nutrition interventions.\n\nKEY RESPONSIBILITIES\n• Develop and manage annual nutrition programme plans and budgets\n• Lead nutrition-sensitive agriculture, WASH, and health integration initiatives\n• Coordinate multi-month assessments including SMART surveys and seasonal KAP studies\n• Manage and mentor a team of nutrition officers and community nutrition workers\n• Represent the organization in nutrition sector working groups and cluster coordination\n• Contribute to proposal development and donor reporting\n• Lead documentation of programme evidence, case studies, and learning products\n\nREQUIRED QUALIFICATIONS\n• Advanced degree in Nutrition, Public Health, or related field\n• Minimum 6 years of experience in nutrition programme management\n• Strong technical knowledge of stunting, wasting, and micronutrient deficiencies\n• Experience managing multi-donor nutrition programmes\n• Excellent written and verbal communication skills in English\n\nWHAT WE OFFER\n• Leadership role in nutrition programming with regional visibility\n• Opportunity to influence nutrition policy and response\n• Attractive compensation and benefits package`,
+  ],
+
+  "Food Security": [
+    `OVERVIEW\nThe Food Security and Livelihoods Officer designs and implements interventions to restore food security and sustainable livelihoods for crisis-affected households. The role focuses on market-based programming, cash transfers, and agricultural support in vulnerable communities.\n\nKEY RESPONSIBILITIES\n• Conduct food security and livelihood assessments using IPC and FEWS NET frameworks\n• Design and implement emergency livelihoods, cash transfer, and food assistance programmes\n• Manage farmer field schools, agricultural inputs distribution, and market support activities\n• Coordinate with government, WFP, FAO, and Food Security Sector partners\n• Monitor programme outputs and outcomes against logframe indicators\n• Prepare donor reports, programme documentation, and lessons-learned products\n• Ensure beneficiary accountability mechanisms are in place and functioning\n\nREQUIRED QUALIFICATIONS\n• Degree in Agriculture, Food Security, Rural Development, or related field\n• Minimum 4 years of experience in food security or livelihoods programming\n• Knowledge of IPC analysis, market systems development, and cash programming\n• Strong analytical and report writing skills\n• Willingness to travel regularly to field locations\n\nWHAT WE OFFER\n• Competitive salary and benefits\n• Exposure to large-scale food security response operations\n• Professional growth in a globally respected organization`,
+
+    `OVERVIEW\nThis position leads market systems development programming to sustainably improve food security and economic resilience. The Market Systems Advisor will design facilitative interventions to unlock private sector investment, strengthen value chains, and improve market access for smallholder farmers and agro-pastoralists.\n\nKEY RESPONSIBILITIES\n• Lead market assessments, system analyses, and value chain studies in target areas\n• Design and oversee market-based livelihood and economic recovery programmes\n• Engage private sector actors, financial institutions, and aggregators as market facilitators\n• Develop monitoring and results measurement (MRM) frameworks for market systems work\n• Build capacity of programme staff and local partners on market systems methodologies\n• Contribute to resource mobilization and proposal development\n• Produce high-quality technical reports, briefs, and learning publications\n\nREQUIRED QUALIFICATIONS\n• Advanced degree in Agricultural Economics, Business Administration, or related field\n• Minimum 6 years of experience in market systems development or value chain programming\n• Strong knowledge of M4P/Springfield Centre MSD methodology\n• Experience designing MRM systems for systemic change programmes\n• Excellent analytical, facilitation, and communication skills\n\nWHAT WE OFFER\n• Competitive salary commensurate with experience\n• Organizational learning culture and technical support network\n• Opportunity to drive systemic change in food systems`,
+  ],
+
+  "WASH": [
+    `OVERVIEW\nThe WASH Engineer designs, supervises, and manages water supply and sanitation infrastructure projects in humanitarian and development settings. The role requires strong technical engineering skills combined with community engagement and programme management competencies.\n\nKEY RESPONSIBILITIES\n• Design water supply systems, sanitation facilities, and hygiene infrastructure\n• Prepare engineering drawings, Bills of Quantities (BoQ), and technical specifications\n• Supervise construction contractors and ensure quality adherence to specifications\n• Conduct water quality testing and manage remediation of contamination issues\n• Facilitate community water management committees and capacity building\n• Coordinate with county WASH departments and inter-agency WASH partners\n• Prepare technical engineering reports, completion certificates, and progress updates\n\nREQUIRED QUALIFICATIONS\n• Degree in Civil Engineering, Water Engineering, or Environmental Engineering\n• Minimum 3 years of WASH infrastructure experience in humanitarian or development settings\n• Proficiency in AutoCAD or similar engineering design software\n• Knowledge of borehole hydrogeology, water treatment, and CLTS approaches\n• Valid driving licence; willingness to travel to field sites\n\nWHAT WE OFFER\n• Competitive salary and field allowances\n• Hands-on engineering experience in challenging and rewarding environments\n• Supportive organizational culture with a focus on technical excellence`,
+
+    `OVERVIEW\nThe WASH Programme Manager provides strategic and operational leadership for water, sanitation, and hygiene programmes serving crisis-affected populations. The role oversees engineering, hygiene promotion, and community-based water management components across multiple field locations.\n\nKEY RESPONSIBILITIES\n• Lead design, implementation, and monitoring of integrated WASH programmes\n• Manage and develop a team of WASH engineers, hygiene promoters, and community mobilizers\n• Oversee WASH programme budgets and ensure value for money\n• Coordinate procurement of WASH supplies and services\n• Ensure compliance with Sphere standards, cluster protocols, and donor requirements\n• Represent the organization in WASH sector coordination forums\n• Contribute to proposal development, donor reporting, and programme evaluations\n\nREQUIRED QUALIFICATIONS\n• Degree in Civil Engineering, Public Health Engineering, or related field\n• Minimum 5 years of WASH programme management experience\n• Proven ability to manage multidisciplinary teams and large budgets\n• Experience in community-led total sanitation (CLTS) and hygiene behaviour change\n• Strong communication and stakeholder engagement skills\n\nWHAT WE OFFER\n• Competitive remuneration and benefits\n• Leadership role in high-impact WASH programming\n• International network and career development support`,
+  ],
+
+  "Education": [
+    `OVERVIEW\nThe Education Programme Officer implements quality education programmes for children and youth in crisis and development contexts. The role focuses on access, retention, and learning outcomes, working with communities, teachers, and government counterparts.\n\nKEY RESPONSIBILITIES\n• Implement education programme activities including EiE, accelerated learning, and ECD\n• Coordinate with Ministry of Education and county/district education departments\n• Train and mentor teachers on child-friendly, inclusive, and psychosocial-support-integrated pedagogy\n• Distribute scholastic materials and support school-in-a-box deployments\n• Monitor student attendance, learning outcomes, and school environment improvements\n• Prepare programme reports, donor updates, and case studies\n• Represent the organization in education cluster and inter-agency coordination meetings\n\nREQUIRED QUALIFICATIONS\n• Degree in Education, Community Development, or related field\n• Minimum 3 years of experience in education programme implementation\n• Knowledge of INEE Minimum Standards for Education in Emergencies\n• Experience working with marginalized children and youth\n• Good community facilitation and communication skills\n\nWHAT WE OFFER\n• Competitive salary and professional development support\n• Contribution to transforming children's lives through education\n• Collaborative and supportive team environment`,
+  ],
+
+  "Logistics": [
+    `OVERVIEW\nThe Logistics Officer manages the supply chain for humanitarian assistance, ensuring timely procurement, transport, and delivery of relief items and programme supplies to field operations.\n\nKEY RESPONSIBILITIES\n• Manage end-to-end supply chain including procurement, transport, warehousing, and distribution\n• Coordinate with vendors, contractors, and clearing agents for timely delivery of supplies\n• Maintain stock records, inventory management systems, and asset registers\n• Monitor supplier performance and conduct market price assessments\n• Ensure compliance with organizational procurement policies and donor requirements\n• Coordinate fleet management and vehicle maintenance scheduling\n• Prepare logistics reports, supply chain dashboards, and donor updates\n\nREQUIRED QUALIFICATIONS\n• Degree in Supply Chain Management, Logistics, or Business Administration\n• Minimum 3 years of experience in humanitarian supply chain or logistics\n• Knowledge of UN/INGO procurement policies and procedures\n• Strong analytical, organizational, and problem-solving skills\n• Proficiency in ERP systems and MS Excel\n\nWHAT WE OFFER\n• Competitive salary and benefits\n• Exposure to complex humanitarian logistics operations\n• Career development within a global supply chain network`,
+  ],
+
+  "Finance": [
+    `OVERVIEW\nThe Finance and Grants Manager oversees all financial management, reporting, and donor compliance functions for the country or field office. The role ensures robust financial systems, timely donor reporting, and strong internal controls.\n\nKEY RESPONSIBILITIES\n• Manage financial operations including budgeting, accounting, payroll, and treasury\n• Oversee grants management portfolio ensuring compliance with donor financial requirements\n• Lead monthly, quarterly, and annual financial reporting to headquarters and donors\n• Conduct internal financial audits and implement audit recommendations\n• Train programme and support staff on financial management and cost efficiency\n• Support proposal development with budget preparation and financial analysis\n• Liaise with external auditors and ensure clean audit outcomes\n\nREQUIRED QUALIFICATIONS\n• Professional accounting qualification (CPA, ACCA, or equivalent) or degree in Finance\n• Minimum 5 years of experience in financial management with international NGOs or UN\n• Strong knowledge of donor financial compliance (USAID, ECHO, FCDO, UN agencies)\n• Proficiency in accounting software (QuickBooks, SAGE, SUN systems, or similar)\n• Excellent attention to detail and organizational skills\n\nWHAT WE OFFER\n• Competitive salary commensurate with qualifications and experience\n• Professional development and exposure to complex multi-donor portfolios\n• Supportive management team committed to staff growth`,
+  ],
+
+  "M&E": [
+    `OVERVIEW\nThe MEAL Officer supports the design and implementation of monitoring, evaluation, accountability, and learning systems across all programme sectors. The role ensures quality data collection, analysis, and use for evidence-based decision making and adaptive management.\n\nKEY RESPONSIBILITIES\n• Design and maintain MEAL frameworks, logframes, and indicator tracking systems\n• Conduct programme quality assessments, post-distribution monitoring, and process evaluations\n• Manage mobile data collection platforms (Kobo Toolbox, ODK, or CommCare)\n• Analyse programme data and produce evidence-based learning briefs and reports\n• Support establishment and operation of Feedback and Complaints Response Mechanisms (FCRM)\n• Train programme staff and partners on data collection tools and quality standards\n• Contribute to baseline surveys, midline reviews, and end-line evaluations\n\nREQUIRED QUALIFICATIONS\n• Degree in Statistics, Development Studies, Social Sciences, or related field\n• Minimum 3 years of MEAL experience in NGO or UN contexts\n• Proficiency in quantitative and qualitative research methods\n• Strong skills in Kobo Toolbox, Excel, SPSS, STATA, or R\n• Knowledge of accountability to affected populations (AAP) standards and approaches\n\nWHAT WE OFFER\n• Competitive salary and benefits package\n• Exposure to diverse sectors and programme modalities\n• Commitment to learning, evidence use, and organizational improvement`,
+  ],
+
+  "Communications": [
+    `OVERVIEW\nThe Communications Officer leads external communications, advocacy, and media engagement for the country or regional office. The role produces high-quality content, manages media relationships, and supports fundraising and advocacy goals.\n\nKEY RESPONSIBILITIES\n• Develop and implement the country office communications and advocacy strategy\n• Produce compelling written, visual, and digital content for external audiences\n• Manage media relationships and respond to press enquiries\n• Coordinate visits of journalists, donors, and VIPs to field programmes\n• Support fundraising by producing donor-oriented case studies, human interest stories, and reports\n• Manage social media channels and digital communications platforms\n• Ensure organizational messaging aligns with global brand guidelines and communication policies\n\nREQUIRED QUALIFICATIONS\n• Degree in Communications, Journalism, International Relations, or related field\n• Minimum 3 years of communications experience in humanitarian or development contexts\n• Excellent English writing, editing, and storytelling skills\n• Photography, videography, or graphic design skills are an asset\n• Experience with social media management and digital content creation\n\nWHAT WE OFFER\n• Competitive salary and benefits\n• Creative and impactful communications role with field exposure\n• Supportive and collaborative team`,
+  ],
+
+  "HR": [
+    `OVERVIEW\nThe Human Resources Manager leads all HR functions for the country office including recruitment, employee relations, performance management, learning and development, and HR compliance. The role supports organizational culture, staff wellbeing, and people strategy.\n\nKEY RESPONSIBILITIES\n• Manage the full-cycle recruitment process for national and international staff\n• Develop and implement HR policies, procedures, and systems aligned with national labour law\n• Lead performance management processes including appraisals and individual development plans\n• Manage staff relations, grievance procedures, and disciplinary processes\n• Coordinate learning and development activities and training needs assessments\n• Manage payroll processing and benefits administration\n• Support staff wellbeing initiatives and psychosocial support programmes\n\nREQUIRED QUALIFICATIONS\n• Degree in Human Resources Management, Business Administration, or related field\n• Minimum 5 years of HR management experience, ideally in INGOs or UN agencies\n• Knowledge of national labour law and HR best practices in the country of operation\n• Strong interpersonal, conflict resolution, and communication skills\n• Proficiency in HR information systems (HRIS) and MS Office\n\nWHAT WE OFFER\n• Competitive salary aligned with sector benchmarks\n• Leadership role in organizational people strategy\n• Supportive, inclusive, and diverse work environment`,
+  ],
+
+  "Legal": [
+    `OVERVIEW\nThe Legal and Compliance Officer provides legal guidance, ensures organizational compliance with applicable laws and regulations, and manages contracts and agreements. The role supports programme and operations teams on legal matters including refugee law, partnership agreements, and data protection.\n\nKEY RESPONSIBILITIES\n• Provide legal advice on organizational operations, contracts, and compliance matters\n• Review and negotiate partnership agreements, MoUs, and sub-grant agreements\n• Ensure compliance with national laws, labour regulations, and donor requirements\n• Manage organizational data protection policies and GDPR compliance\n• Support immigration and work permit processes for international staff\n• Liaise with government ministries, regulatory bodies, and legal counsel\n• Train staff on legal compliance, ethics, and safeguarding standards\n\nREQUIRED QUALIFICATIONS\n• Law degree (LLB) with admission to the bar; LLM preferred\n• Minimum 4 years of legal experience, ideally in international development or humanitarian sector\n• Knowledge of international humanitarian law, refugee law, and human rights law\n• Strong analytical, negotiation, and communication skills\n• Fluency in English; knowledge of French or Arabic an advantage\n\nWHAT WE OFFER\n• Competitive salary and benefits\n• Unique legal role at the intersection of law and international development\n• Career development in a globally respected organization`,
+  ],
+
+  "IT": [
+    `OVERVIEW\nThe IT Systems Administrator manages information technology infrastructure, cybersecurity, and digital systems for the country or regional office. The role ensures reliable, secure, and efficient IT operations to support programme and operational teams.\n\nKEY RESPONSIBILITIES\n• Manage and maintain IT infrastructure including servers, networks, and end-user devices\n• Implement and monitor cybersecurity policies and incident response procedures\n• Provide technical support and troubleshoot hardware and software issues\n• Manage cloud services, email systems, and collaboration tools\n• Coordinate IT procurement and asset management\n• Train staff on digital security, software use, and remote working tools\n• Contribute to digital transformation and ICT4D initiatives\n\nREQUIRED QUALIFICATIONS\n• Degree in Computer Science, IT, or related field; CCNA, CompTIA, or equivalent certifications preferred\n• Minimum 3 years of IT systems administration experience\n• Knowledge of network infrastructure, cloud platforms (Azure, AWS), and cybersecurity\n• Experience in humanitarian IT support and remote field operations\n• Strong problem-solving and communication skills\n\nWHAT WE OFFER\n• Competitive salary and benefits\n• Exposure to diverse IT environments across multiple field locations\n• Professional development in IT security and digital transformation`,
+  ],
+
+  "Coordination": [
+    `OVERVIEW\nThe Humanitarian Affairs and Coordination Officer supports inter-agency coordination, information management, and humanitarian response planning. The role facilitates effective coordination among UN agencies, NGOs, and government counterparts to ensure principled, timely, and effective humanitarian assistance.\n\nKEY RESPONSIBILITIES\n• Facilitate cluster and sector coordination meetings and manage meeting documentation\n• Develop and maintain Who Does What Where (3W) databases and response monitoring tools\n• Produce situation reports, flash updates, and humanitarian dashboards\n• Support Humanitarian Needs Overview (HNO) and Humanitarian Response Plan (HRP) development\n• Liaise with national and local authorities on humanitarian access and coordination\n• Manage information products and ensure timely dissemination to partners\n• Support needs assessments, joint monitoring missions, and inter-agency evaluations\n\nREQUIRED QUALIFICATIONS\n• Advanced degree in International Relations, Development Studies, or related field\n• Minimum 4 years of humanitarian coordination or information management experience\n• Knowledge of the Humanitarian Programme Cycle (HPC) and cluster system\n• Proficiency in data visualization tools and GIS mapping\n• Excellent English writing and communication skills\n\nWHAT WE OFFER\n• Competitive salary and UN/INGO benefits package\n• Exposure to humanitarian leadership and coordination architecture\n• Dynamic, high-impact work environment`,
+  ],
+
+  "Camp Management": [
+    `OVERVIEW\nThe Camp Manager provides overall management and coordination of services in refugee or IDP settlements, ensuring a safe, dignified, and protective environment for camp residents. The role coordinates all sector actors operating within the site and maintains community engagement mechanisms.\n\nKEY RESPONSIBILITIES\n• Coordinate multi-sector service delivery within refugee/IDP settlements\n• Manage site governance structures and community representation committees\n• Conduct regular site monitoring and maintenance assessments\n• Maintain accurate population data and movement tracking\n• Lead coordination of CCCM cluster activities and partner meetings\n• Develop and implement contingency plans for camp emergencies\n• Ensure accountability to affected populations through effective complaint mechanisms\n\nREQUIRED QUALIFICATIONS\n• Degree in Social Sciences, Development Studies, or related field\n• Minimum 4 years of experience in camp management or CCCM coordination\n• Knowledge of CCCM cluster standards and IDP/refugee camp management guidelines\n• Strong coordination, leadership, and community engagement skills\n• Willingness to live and work in a camp or field duty station\n\nWHAT WE OFFER\n• Competitive field-based salary and allowances\n• Unique and challenging leadership role in displacement response\n• Career development in CCCM sector within a global network`,
+  ],
+
+  "Shelter": [
+    `OVERVIEW\nThe Shelter Engineer designs, plans, and supervises emergency and transitional shelter construction for displaced households. The role combines technical engineering expertise with community participation to deliver dignified, safe, and culturally appropriate housing solutions.\n\nKEY RESPONSIBILITIES\n• Develop shelter designs, engineering drawings, and Bills of Quantities for emergency and transitional shelter\n• Supervise shelter construction and rehabilitation by contractors and community self-help builders\n• Conduct shelter technical assessments and post-distribution monitoring\n• Distribute Non-Food Items (NFIs) and essential household items to beneficiaries\n• Engage communities in shelter design and construction processes\n• Coordinate with the Shelter Cluster and other shelter partners on gap analysis\n• Prepare technical reports, construction completion records, and programme updates\n\nREQUIRED QUALIFICATIONS\n• Degree in Civil Engineering, Architecture, or Construction Management\n• Minimum 3 years of shelter/construction management in humanitarian settings\n• Knowledge of humanitarian shelter standards (Sphere, humanitarian shelter guidelines)\n• Experience with community participation in construction and self-help approaches\n• Strong organizational and field logistics skills\n\nWHAT WE OFFER\n• Competitive salary and field allowances\n• Contribution to dignified shelter for displaced families\n• Collaborative and committed humanitarian team`,
+  ],
+
+  "Senior Leadership": [
+    `OVERVIEW\nThe Country Director provides strategic leadership and overall management of the country programme. The Country Director is responsible for organizational representation, resource mobilization, programme quality, security management, and staff development.\n\nKEY RESPONSIBILITIES\n• Provide strategic direction and oversight of all country programme operations\n• Represent the organization with donors, government, UN agencies, and civil society\n• Lead resource mobilization and donor relationship management\n• Ensure programme quality and alignment with organizational strategy\n• Oversee financial management, compliance, and risk management\n• Lead and develop a senior country management team\n• Manage organizational security and duty-of-care obligations\n• Maintain relationships with host government ministries and regulatory bodies\n\nREQUIRED QUALIFICATIONS\n• Master's degree in International Development, Development Studies, Business Administration, or related field\n• Minimum 10 years of progressive senior management experience in international development or humanitarian work\n• Proven track record in resource mobilization and donor relationship management\n• Strong leadership, strategic thinking, and team development capabilities\n• Excellent communication, negotiation, and representation skills\n\nWHAT WE OFFER\n• Senior leadership role with organizational visibility and impact\n• Competitive executive salary and comprehensive benefits package\n• Opportunity to shape organizational strategy at country level`,
+  ],
+
+  "Other": [
+    `OVERVIEW\nThis position supports programme implementation, community engagement, and field operations to deliver high-quality humanitarian and development results. The role requires strong interpersonal skills, field presence, and commitment to the organization's mission and values.\n\nKEY RESPONSIBILITIES\n• Support programme implementation activities in target communities\n• Conduct community needs assessments and beneficiary registration\n• Facilitate community meetings, focus group discussions, and stakeholder consultations\n• Coordinate with community leaders, local government, and partner organizations\n• Collect programme data, document field observations, and prepare activity reports\n• Ensure beneficiary accountability and community feedback mechanisms are functional\n• Support integration of cross-cutting themes including gender, protection, and environment\n\nREQUIRED QUALIFICATIONS\n• Degree in Social Sciences, Community Development, or related field\n• Minimum 2–3 years of field programme experience\n• Strong community engagement, facilitation, and communication skills\n• Proficiency in local languages spoken in target communities\n• Willingness to travel regularly to field locations\n\nWHAT WE OFFER\n• Competitive salary and benefits aligned with sector norms\n• Immersive field experience with vulnerable communities\n• Supportive organizational culture committed to programme quality`,
+  ],
+};
+
+// ── 120 ORGANIZATIONS ─────────────────────────────────────────────────────────
+type OrgDef = {
+  name: string;
+  description: string;
+  website: string;
+  type: string;
+  regions: string[];
+  sectors: string[];
+};
+
+const ORGS: OrgDef[] = [
+  // ── UN AGENCIES (25) ──────────────────────────────────────────────────────
+  { name: "UNHCR", description: "UNHCR, the UN Refugee Agency, leads international action to protect refugees, forcibly displaced communities, and stateless people. Operating in 137 countries, UNHCR delivers protection, emergency relief, and durable solutions for over 110 million displaced people worldwide.", website: "https://www.unhcr.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Europe HQ", "Global"], sectors: ["Protection", "Legal", "M&E", "Coordination", "HR", "Finance", "Camp Management", "Shelter", "Communications", "Other"] },
+  { name: "UNICEF", description: "UNICEF works in over 190 countries and territories to save children's lives, defend their rights, and help them fulfil their potential. From early childhood through adolescence, UNICEF delivers programmes in health, nutrition, WASH, education, and child protection.", website: "https://www.unicef.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Health", "Nutrition", "Education", "WASH", "Protection", "M&E", "Communications", "Finance", "HR", "Other"] },
+  { name: "WFP", description: "WFP is the world's largest humanitarian organization, saving lives in emergencies and using food assistance to build pathways to peace, stability, and prosperity for people recovering from conflict, disasters, and climate change. WFP assists around 160 million people annually.", website: "https://www.wfp.org", type: "UN", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Food Security", "Nutrition", "Logistics", "M&E", "Finance", "Communications", "IT", "Coordination", "HR", "Other"] },
+  { name: "WHO", description: "WHO is the United Nations' specialized agency for health. We lead global efforts to expand universal health coverage and coordinate the world's response to health emergencies. WHO has 194 member states and offices in over 150 countries.", website: "https://www.who.int", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Europe HQ", "Global"], sectors: ["Health", "Nutrition", "WASH", "M&E", "Legal", "Communications", "HR", "Finance", "Coordination", "IT"] },
+  { name: "IOM", description: "IOM is the UN Migration Agency. With 174 member states and over 550 field locations worldwide, IOM works at the nexus of humanitarian aid, development, and peacebuilding to provide life-saving assistance to migrants and displaced populations.", website: "https://www.iom.int", type: "UN", regions: ["East Africa", "MENA", "South Asia", "Southeast Asia", "Central Asia", "Americas", "Global"], sectors: ["Protection", "Health", "Camp Management", "M&E", "Finance", "Logistics", "Communications", "Coordination", "IT", "HR"] },
+  { name: "UNDP", description: "UNDP is the UN's global development network, helping countries to achieve the eradication of poverty and the reduction of inequalities and exclusion. Working in about 170 countries, UNDP helps nations build and share solutions to the challenges of sustainable development.", website: "https://www.undp.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Central Asia", "Americas", "Global"], sectors: ["Coordination", "Finance", "M&E", "Communications", "Legal", "IT", "HR", "Other", "Food Security", "Education"] },
+  { name: "OCHA", description: "OCHA is the UN Office for the Coordination of Humanitarian Affairs. OCHA's mission is to coordinate the global emergency response to save lives and protect people in humanitarian crises. OCHA advocates for effective and principled humanitarian action.", website: "https://www.unocha.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "Global", "South Asia"], sectors: ["Coordination", "M&E", "Communications", "Finance", "HR", "IT", "Legal", "Other"] },
+  { name: "UN Women", description: "UN Women is the UN organization dedicated to gender equality and the empowerment of women. A global champion for women and girls, UN Women was established to accelerate progress on meeting women's needs worldwide.", website: "https://www.unwomen.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Protection", "Other", "Communications", "Finance", "M&E", "Legal", "HR", "Coordination", "Education", "Food Security"] },
+  { name: "FAO", description: "FAO is the UN specialized agency that leads international efforts to defeat hunger. FAO works in over 130 countries to achieve food security for all and ensure people have regular access to enough high-quality food to lead active, healthy lives.", website: "https://www.fao.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Food Security", "Nutrition", "M&E", "Finance", "Communications", "Legal", "IT", "Coordination", "Logistics", "HR"] },
+  { name: "ILO", description: "ILO is the UN specialized agency for labour. The ILO brings together governments, employers, and workers of 187 member states to set labour standards, develop policies, and devise programmes promoting decent work for all women and men.", website: "https://www.ilo.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Europe HQ", "Global"], sectors: ["Other", "Legal", "Finance", "HR", "M&E", "Communications", "Coordination", "Education", "IT", "Protection"] },
+  { name: "UNFPA", description: "UNFPA is the UN sexual and reproductive health agency. Our mission is to deliver a world where every pregnancy is wanted, every birth is safe, and every young person's potential is fulfilled. UNFPA operates in more than 150 countries.", website: "https://www.unfpa.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Health", "Protection", "Communications", "M&E", "Finance", "HR", "Legal", "Coordination", "Education", "Other"] },
+  { name: "UNESCO", description: "UNESCO is the UN Educational, Scientific and Cultural Organization. UNESCO seeks to build peace through international cooperation in education, sciences, culture, communication, and information. UNESCO has 193 member states.", website: "https://www.unesco.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Europe HQ", "Global"], sectors: ["Education", "Communications", "Legal", "M&E", "HR", "Finance", "IT", "Coordination", "Other", "Protection"] },
+  { name: "UNOPS", description: "UNOPS helps the UN and its partners provide peace and security, humanitarian and development solutions. UNOPS manages projects worth billions of dollars per year across infrastructure, procurement, HR, and financial management services.", website: "https://www.unops.org", type: "UN", regions: ["East Africa", "MENA", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Logistics", "Finance", "HR", "Legal", "IT", "Coordination", "M&E", "Other", "Shelter", "WASH"] },
+  { name: "UNAIDS", description: "UNAIDS leads the global effort to end AIDS as a public health threat by 2030. With a Secretariat in Geneva and offices in 70+ countries, UNAIDS brings together 11 UN cosponsors to drive the world's most comprehensive response to a single disease.", website: "https://www.unaids.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Health", "Communications", "Legal", "M&E", "Finance", "HR", "Coordination", "Other", "Education", "Protection"] },
+  { name: "UNEP", description: "UNEP is the leading global environmental authority that sets the global environmental agenda and promotes coherent implementation of sustainable development. UNEP catalyzes change and provides knowledge and capacity support for environmental governance.", website: "https://www.unep.org", type: "UN", regions: ["East Africa", "Europe HQ", "Americas", "Southeast Asia", "Global"], sectors: ["Other", "Legal", "Communications", "M&E", "Finance", "HR", "Coordination", "IT", "Education", "Food Security"] },
+  { name: "UN-Habitat", description: "UN-Habitat is the UN programme working towards a better urban future. Its mission is to promote socially and environmentally sustainable human settlements development and adequate shelter for all. UN-Habitat has programmes in over 90 countries.", website: "https://unhabitat.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Shelter", "WASH", "Legal", "Finance", "M&E", "Communications", "Coordination", "Other", "IT", "HR"] },
+  { name: "IFAD", description: "IFAD is an international financial institution and a UN specialized agency dedicated to eradicating rural poverty and hunger. IFAD invests in rural people, empowering them to increase their food and nutritional security, raise their incomes, and strengthen their resilience.", website: "https://www.ifad.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Food Security", "Finance", "M&E", "Legal", "Communications", "HR", "Coordination", "Other", "IT", "Education"] },
+  { name: "UNIDO", description: "UNIDO is the specialized UN agency that promotes industrial development for poverty reduction, inclusive globalization, and environmental sustainability. UNIDO operates in more than 170 countries, providing technical cooperation to advance sustainable industrialization.", website: "https://www.unido.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Europe HQ", "Global"], sectors: ["Other", "Legal", "Finance", "M&E", "Communications", "HR", "IT", "Coordination", "Food Security", "Education"] },
+  { name: "ITU", description: "ITU is the UN specialized agency for information and communication technologies. ITU's mission is to connect the world through ICT, driving digital transformation globally. ITU has 193 member states and over 900 private sector entities.", website: "https://www.itu.int", type: "UN", regions: ["Europe HQ", "East Africa", "MENA", "Global", "Southeast Asia"], sectors: ["IT", "Legal", "Finance", "HR", "M&E", "Communications", "Coordination", "Other", "Education", "Food Security"] },
+  { name: "World Bank Group", description: "The World Bank Group is one of the world's largest sources of funding and knowledge for developing countries. Its five institutions share a commitment to reducing poverty, increasing shared prosperity, and promoting sustainable development.", website: "https://www.worldbank.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Finance", "M&E", "Legal", "Communications", "IT", "HR", "Coordination", "Other", "Education", "Health"] },
+  { name: "UNDSS", description: "UNDSS is the UN security management system, providing safety, security, and health services for UN staff, eligible dependants, and their property worldwide. UNDSS aims to enable the UN to deliver its programmes and activities safely.", website: "https://www.undss.org", type: "UN", regions: ["East Africa", "MENA", "South Asia", "Global"], sectors: ["Legal", "Other", "HR", "IT", "Communications", "Coordination", "Finance", "M&E", "Protection", "Logistics"] },
+  { name: "WMO", description: "WMO is the UN specialized agency for meteorology, climatology, hydrology, and related geophysical sciences. WMO facilitates the free and unrestricted exchange of data, information, and services to support disaster risk reduction and climate change adaptation.", website: "https://public.wmo.int", type: "UN", regions: ["Europe HQ", "East Africa", "Global"], sectors: ["Other", "IT", "M&E", "Communications", "Legal", "Finance", "HR", "Coordination", "Education", "Food Security"] },
+  { name: "UNITAID", description: "UNITAID is a global health initiative that uses innovative approaches to bring new and improved products to the people who need them most. Hosted by WHO, UNITAID works with partners in over 90 countries to improve treatment for HIV, tuberculosis, and malaria.", website: "https://unitaid.org", type: "UN", regions: ["Europe HQ", "East Africa", "Global", "West Africa"], sectors: ["Health", "Finance", "Legal", "M&E", "Communications", "HR", "Coordination", "Other", "IT", "Logistics"] },
+  { name: "GAVI – The Vaccine Alliance", description: "GAVI, the Vaccine Alliance, is a public-private global health partnership committed to increasing access to immunisation in poor countries. GAVI has helped immunise more than 1 billion children and contributed to the prevention of more than 17.3 million future deaths.", website: "https://www.gavi.org", type: "UN", regions: ["East Africa", "West Africa", "South Asia", "Europe HQ", "Global"], sectors: ["Health", "Finance", "Legal", "M&E", "Communications", "HR", "Logistics", "Other", "IT", "Coordination"] },
+  { name: "The Global Fund", description: "The Global Fund is a 21st century partnership organization designed to accelerate the end of AIDS, tuberculosis, and malaria as epidemics. It mobilizes and invests more than US$4 billion a year to support programmes run by local experts.", website: "https://www.theglobalfund.org", type: "UN", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Europe HQ", "Global"], sectors: ["Health", "Finance", "Legal", "M&E", "Communications", "HR", "Coordination", "Other", "IT", "Logistics"] },
+
+  // ── MAJOR INGOs (35) ──────────────────────────────────────────────────────
+  { name: "Save the Children International", description: "Save the Children is the world's leading independent organisation for children with work in over 100 countries. We save children's lives, fight for their rights, and help them fulfil their potential through programmes in health, nutrition, education, child protection, and emergency response.", website: "https://www.savethechildren.net", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "Nutrition", "Education", "Protection", "Food Security", "M&E", "Finance", "HR", "Communications", "Coordination"] },
+  { name: "Oxfam International", description: "Oxfam is an international confederation of 21 organizations working together with partners and local communities in more than 90 countries. Oxfam fights inequality to overcome poverty and injustice through humanitarian response, long-term development, and influencing campaigns.", website: "https://www.oxfam.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Food Security", "WASH", "Protection", "Finance", "M&E", "Communications", "HR", "Legal", "Coordination", "Other"] },
+  { name: "Médecins Sans Frontières (MSF)", description: "MSF provides medical assistance to people affected by conflict, epidemics, disasters, or exclusion from healthcare. MSF works in over 70 countries with over 40,000 staff members, operating with independence, impartiality, and neutrality.", website: "https://www.msf.org", type: "INGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia"], sectors: ["Health", "Nutrition", "Logistics", "M&E", "HR", "Finance", "Communications", "Legal", "Coordination", "Other"] },
+  { name: "International Rescue Committee (IRC)", description: "The IRC responds to the world's worst humanitarian crises and helps people to survive, recover, and gain control of their future in more than 40 countries and 20 US cities. IRC's programmes span from emergency relief to longer-term development.", website: "https://www.rescue.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Protection", "Health", "Education", "Food Security", "Nutrition", "WASH", "M&E", "Finance", "HR", "Coordination"] },
+  { name: "World Vision International", description: "World Vision is a Christian humanitarian, development, and advocacy organisation dedicated to working with children, families, and communities to overcome poverty and injustice. We serve over 200 million people in nearly 100 countries worldwide.", website: "https://www.wvi.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "Nutrition", "Education", "Food Security", "WASH", "Protection", "M&E", "Finance", "HR", "Communications"] },
+  { name: "CARE International", description: "CARE is a leading humanitarian and development organization fighting global poverty. CARE places special focus on working alongside poor women and girls because, equipped with the proper resources, women have the power to help whole families and entire communities escape poverty.", website: "https://www.care.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Food Security", "WASH", "Health", "Protection", "Education", "M&E", "Finance", "HR", "Communications", "Coordination"] },
+  { name: "Action Against Hunger (ACF)", description: "Action Against Hunger is a global humanitarian and development organisation committed to ending hunger. Founded in 1979, we deliver programmes in nutrition, food security, health, WASH, and mental health, reaching over 21 million people in over 50 countries each year.", website: "https://www.actionagainsthunger.org", type: "INGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia", "Americas"], sectors: ["Nutrition", "WASH", "Food Security", "Health", "M&E", "Finance", "HR", "Logistics", "Communications", "Coordination"] },
+  { name: "Norwegian Refugee Council (NRC)", description: "NRC is an independent humanitarian organisation helping people forced to flee. NRC works in conflict-affected areas in Africa, the Middle East, Asia, and Latin America, providing assistance in shelter, education, information and legal aid, and food security and livelihoods.", website: "https://www.nrc.no", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Central Asia"], sectors: ["Shelter", "Education", "Legal", "Food Security", "Protection", "M&E", "Finance", "HR", "Logistics", "Coordination"] },
+  { name: "Danish Refugee Council (DRC)", description: "DRC is a leading international NGO that assists refugees and internally displaced people around the world. Operating in 40+ countries, DRC provides protection, livelihoods, economic recovery, shelter, WASH, and humanitarian mine action.", website: "https://www.drc.ngo", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Central Asia"], sectors: ["Protection", "Shelter", "Food Security", "M&E", "Finance", "HR", "Legal", "Camp Management", "WASH", "Coordination"] },
+  { name: "Mercy Corps", description: "Mercy Corps is a global team of humanitarians working together on the front lines of today's biggest crises to create a future of possibility, where everyone can prosper. We operate in more than 40 countries, helping over 30 million people recover from disaster and disaster-related poverty.", website: "https://www.mercycorps.org", type: "INGO", regions: ["East Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Food Security", "WASH", "Finance", "M&E", "HR", "Communications", "Legal", "IT", "Coordination", "Other"] },
+  { name: "Plan International", description: "Plan International is an independent development and humanitarian organisation that advances children's rights and equality for girls. Working in more than 80 countries, Plan International strives for a just world, tackling the root causes of the challenges facing girls and all vulnerable children.", website: "https://plan-international.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["Education", "Protection", "Health", "WASH", "M&E", "Finance", "HR", "Communications", "Food Security", "Coordination"] },
+  { name: "GOAL Global", description: "GOAL is an international humanitarian organisation dedicated to the alleviation of suffering and the improvement of the lives of the most vulnerable communities. GOAL works in 13 countries in Africa, the Middle East, and the Americas.", website: "https://www.goal.ie", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Health", "Nutrition", "WASH", "Food Security", "M&E", "Finance", "HR", "Logistics", "Communications", "Other"] },
+  { name: "Islamic Relief Worldwide", description: "Islamic Relief Worldwide is an international humanitarian organisation with presence in over 40 countries. We provide emergency relief and long-term development support in food, water, health, education, livelihoods, and orphan and child welfare.", website: "https://www.islamic-relief.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Food Security", "WASH", "Health", "Education", "Protection", "M&E", "Finance", "HR", "Communications", "Other"] },
+  { name: "Catholic Relief Services (CRS)", description: "CRS is the official international humanitarian agency of the Catholic community in the United States. CRS works to save, protect, and transform lives in need across 100+ countries through relief, recovery, and development programmes.", website: "https://www.crs.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Food Security", "Health", "Education", "WASH", "M&E", "Finance", "HR", "Legal", "Coordination", "Communications"] },
+  { name: "Tearfund", description: "Tearfund is a Christian relief and development agency working in over 50 countries, partnering with local churches and organisations to overcome poverty and disasters. Tearfund focuses on disaster risk reduction, climate resilience, clean water, and livelihoods.", website: "https://www.tearfund.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Food Security", "WASH", "M&E", "Finance", "HR", "Communications", "Education", "Health", "Other", "Coordination"] },
+  { name: "AMREF Health Africa", description: "AMREF Health Africa is Africa's largest indigenous health development NGO, founded in Kenya in 1957. AMREF Health Africa works across 35 African countries to improve the health of over 30 million people, focusing on health systems strengthening and community health.", website: "https://amref.org", type: "INGO", regions: ["East Africa", "West Africa", "Southern Africa"], sectors: ["Health", "WASH", "M&E", "Finance", "HR", "Communications", "Legal", "IT", "Coordination", "Other"] },
+  { name: "IFRC – Red Cross Red Crescent", description: "The International Federation of Red Cross and Red Crescent Societies (IFRC) is the world's largest humanitarian network. With 192 national societies worldwide, IFRC coordinates and directs international assistance in natural disasters and emergency response.", website: "https://www.ifrc.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Europe HQ"], sectors: ["Health", "WASH", "Logistics", "Finance", "M&E", "HR", "Communications", "Coordination", "Food Security", "Other"] },
+  { name: "Concern Worldwide", description: "Concern Worldwide is an international humanitarian aid organisation dedicated to the reduction of suffering and working towards the ultimate elimination of extreme poverty in the world's poorest countries. We work with over 30 million people across 27 countries.", website: "https://www.concern.net", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Nutrition", "Food Security", "WASH", "Health", "M&E", "Finance", "HR", "Communications", "Education", "Other"] },
+  { name: "Welthungerhilfe", description: "Welthungerhilfe is one of Germany's largest private aid organisations. Working in more than 70 countries, Welthungerhilfe fights hunger and advocates for more equitable global food security through emergency relief, rehabilitation, and long-term development.", website: "https://www.welthungerhilfe.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Food Security", "WASH", "Nutrition", "M&E", "Finance", "HR", "Education", "Communications", "Other", "Coordination"] },
+  { name: "Humanity & Inclusion (HI)", description: "Humanity & Inclusion, formerly Handicap International, is an independent and impartial aid and development organisation working in situations of poverty and exclusion, conflict, and disaster. HI works alongside people with disabilities in more than 60 countries.", website: "https://hi.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Protection", "Health", "Shelter", "Education", "M&E", "Finance", "HR", "Communications", "Legal", "Other"] },
+  { name: "Médecins du Monde (MdM)", description: "Médecins du Monde is an international humanitarian organisation providing medical assistance to vulnerable populations in conflict zones and areas of social exclusion, both internationally and in France. MdM works in over 70 countries.", website: "https://medecinsdumonde.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Health", "Protection", "M&E", "Finance", "HR", "Communications", "Legal", "Coordination", "WASH", "Other"] },
+  { name: "INTERSOS", description: "INTERSOS is a non-profit humanitarian organisation that operates in emergency situations responding to the needs of people in situations of armed conflict, natural disasters, and extreme vulnerability. INTERSOS is present in 23 countries.", website: "https://www.intersos.org", type: "INGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia"], sectors: ["Protection", "Health", "Education", "WASH", "M&E", "Finance", "HR", "Communications", "Camp Management", "Shelter"] },
+  { name: "Relief International", description: "Relief International is a leading nonprofit organisation that transforms adversity into renewal for the world's most vulnerable populations. RI works in 15 countries in Asia, Africa, and the Middle East with programmes in health, WASH, livelihoods, and protection.", website: "https://ri.org", type: "INGO", regions: ["East Africa", "MENA", "South Asia", "Southeast Asia"], sectors: ["Health", "WASH", "Protection", "Food Security", "M&E", "Finance", "HR", "Logistics", "Communications", "Other"] },
+  { name: "International Medical Corps (IMC)", description: "International Medical Corps is a global humanitarian nonprofit organisation dedicated to saving lives and relieving suffering through health care training and relief and development programmes. IMC works in over 30 countries.", website: "https://internationalmedicalcorps.org", type: "INGO", regions: ["East Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "Nutrition", "WASH", "Protection", "M&E", "Finance", "HR", "Logistics", "Communications", "Coordination"] },
+  { name: "Solidarités International", description: "Solidarités International is an NGO founded in 1980, specialising in water, sanitation, hygiene, and food security in 18 countries across Africa, Asia, the Middle East, and the Americas. We reach over 4 million people each year.", website: "https://www.solidarites.org", type: "INGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia"], sectors: ["WASH", "Food Security", "M&E", "Finance", "HR", "Logistics", "Communications", "Coordination", "Other", "Shelter"] },
+  { name: "War Child International", description: "War Child International is an independent organisation helping children affected by war. War Child specialises in psychosocial support, child protection, education, and access to justice in conflict-affected communities across Africa, the Middle East, and Asia.", website: "https://www.warchild.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Protection", "Education", "M&E", "Finance", "HR", "Communications", "Coordination", "Legal", "Other", "Health"] },
+  { name: "SOS Children's Villages International", description: "SOS Children's Villages is a global federation working in 136 countries and territories. Since 1949, we have been helping children who have lost parental care or who are at risk of losing it, alongside supporting families and communities.", website: "https://www.sos-childrensvillages.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas", "Europe HQ"], sectors: ["Protection", "Education", "Health", "M&E", "Finance", "HR", "Communications", "Legal", "Coordination", "Other"] },
+  { name: "Aga Khan Foundation", description: "The Aga Khan Foundation (AKF) is a private, non-denominational development agency that supports programmes in health, education, rural development, and civil society. AKF operates in Asia, Africa, and North America across over 30 countries.", website: "https://www.akdn.org/aga-khan-foundation", type: "INGO", regions: ["East Africa", "South Asia", "Central Asia", "West Africa"], sectors: ["Health", "Education", "Food Security", "M&E", "Finance", "HR", "Communications", "WASH", "Other", "Coordination"] },
+  { name: "BRAC International", description: "BRAC International is one of the world's largest development organisations, dedicated to empowering people living in poverty. Originally from Bangladesh, BRAC operates in 11 countries across Africa and Asia with programmes in microfinance, health, education, and livelihood development.", website: "https://brac.net", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia"], sectors: ["Food Security", "Health", "Education", "Finance", "M&E", "HR", "Communications", "Protection", "Other", "Coordination"] },
+  { name: "Caritas Internationalis", description: "Caritas Internationalis is a confederation of 162 Catholic relief, development, and social service organisations operating in over 200 countries and territories worldwide. Caritas works to build a better world, especially for the poor and oppressed.", website: "https://www.caritas.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Europe HQ"], sectors: ["Health", "Food Security", "Education", "WASH", "M&E", "Finance", "HR", "Communications", "Legal", "Other"] },
+  { name: "Lutheran World Federation (LWF)", description: "LWF is a global communion of 148 churches in 99 countries. LWF's World Service is one of the largest Lutheran humanitarian agencies in the world, providing long-term development and emergency relief in areas of conflict and disaster.", website: "https://www.lutheranworld.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Central Asia"], sectors: ["Protection", "WASH", "Shelter", "Food Security", "M&E", "Finance", "HR", "Legal", "Coordination", "Education"] },
+  { name: "Church World Service (CWS)", description: "CWS is a cooperative ministry of 37 Christian denominations providing sustainable self-help, development, disaster relief, and refugee assistance around the world. Since 1946, CWS has worked in partnership with local organisations in more than 30 countries.", website: "https://cwsglobal.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Protection", "Food Security", "WASH", "M&E", "Finance", "HR", "Communications", "Legal", "Coordination", "Other"] },
+  { name: "Samaritan's Purse", description: "Samaritan's Purse is an international relief and evangelism organisation helping meet needs of people who are victims of war, poverty, natural disasters, disease, and famine. With offices in over 100 countries, Samaritan's Purse serves the physical and spiritual needs of the poor.", website: "https://www.samaritanspurse.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Health", "WASH", "Food Security", "Shelter", "M&E", "Finance", "HR", "Logistics", "Other", "Communications"] },
+  { name: "Food for the Hungry (FH)", description: "Food for the Hungry is a Christian international relief and development organisation that strives to end poverty through integrated, community-driven solutions. FH works in 23 countries across Africa, Asia, and Latin America.", website: "https://www.fh.org", type: "INGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Food Security", "Health", "Education", "WASH", "M&E", "Finance", "HR", "Communications", "Other", "Coordination"] },
+  { name: "FHI 360", description: "FHI 360 is a nonprofit human development organisation dedicated to improving lives in lasting ways by advancing integrated, locally driven solutions. Our staff includes experts in health, education, nutrition, environment, economic development, civil society, gender, youth, and research.", website: "https://www.fhi360.org", type: "INGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "Education", "Nutrition", "M&E", "Finance", "HR", "IT", "Communications", "Legal", "Coordination"] },
+
+  // ── DEVELOPMENT & TECHNICAL ORGS (25) ─────────────────────────────────────
+  { name: "Partners in Health (PIH)", description: "Partners in Health is a global health organisation that aims to provide a preferential option for the poor in healthcare. PIH works across 12 countries to deliver high-quality care to the world's poorest communities by strengthening health systems.", website: "https://www.pih.org", type: "NGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "Americas"], sectors: ["Health", "M&E", "Finance", "HR", "Communications", "Coordination", "Nutrition", "Education", "Other", "Logistics"] },
+  { name: "John Snow Inc. (JSI)", description: "JSI is a global health consulting and research organisation dedicated to improving the health of individuals and communities throughout the world. JSI provides technical and management assistance to strengthen health systems and service delivery in 100+ countries.", website: "https://www.jsi.com", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "M&E", "Finance", "HR", "Logistics", "IT", "Communications", "Coordination", "Other", "Nutrition"] },
+  { name: "IntraHealth International", description: "IntraHealth International champions the health and performance of health workers in low-income countries through workforce development, technology innovation, and leadership. IntraHealth works in over 30 countries across Africa, Asia, and Latin America.", website: "https://www.intrahealth.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Health", "HR", "IT", "M&E", "Finance", "Communications", "Legal", "Coordination", "Education", "Other"] },
+  { name: "Management Sciences for Health (MSH)", description: "MSH is a global nonprofit that works with governments, civil society, and the private sector to build resilient and sustainable health systems. MSH's programmes support pharmaceutical management, health governance, health finance, and service delivery in 65+ countries.", website: "https://www.msh.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Health", "Finance", "M&E", "HR", "Logistics", "Legal", "IT", "Communications", "Coordination", "Other"] },
+  { name: "Population Services International (PSI)", description: "PSI is a global health organisation that makes it easier for people in the developing world to lead healthier lives and plan families they desire. PSI uses social marketing, behaviour change communications, and service delivery in 50+ countries.", website: "https://www.psi.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Health", "M&E", "Finance", "Communications", "HR", "Logistics", "Legal", "IT", "Coordination", "Other"] },
+  { name: "Pathfinder International", description: "Pathfinder International is a global leader in sexual and reproductive health and rights. With programmes in 20+ countries, Pathfinder works to ensure all people have access to quality sexual and reproductive health care, especially women and girls.", website: "https://www.pathfinder.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Americas"], sectors: ["Health", "M&E", "Finance", "HR", "Communications", "Education", "Legal", "Coordination", "Other", "IT"] },
+  { name: "International Alert", description: "International Alert is an independent peacebuilding organisation that has been working for over 30 years to lay the foundations for lasting peace and security in communities affected by violent conflict. We work in around 20 countries in Africa, Asia, Europe, and Latin America.", website: "https://www.international-alert.org", type: "NGO", regions: ["East Africa", "West Africa", "Central Asia", "South Asia", "MENA"], sectors: ["Other", "Legal", "M&E", "Finance", "HR", "Communications", "Coordination", "Protection", "Education", "Food Security"] },
+  { name: "Search for Common Ground", description: "Search for Common Ground works to transform how individuals, organisations, and governments deal with conflict. We work with all parts of society to build sustainable peace in 35 countries around the world.", website: "https://www.sfcg.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Central Asia"], sectors: ["Communications", "M&E", "Finance", "HR", "Legal", "Education", "Protection", "Other", "Coordination", "IT"] },
+  { name: "ACTED", description: "ACTED is an international NGO providing emergency relief, recovery, and development support. ACTED coordinates its programmes in over 35 countries with 6,000+ staff and reaches more than 20 million people each year.", website: "https://www.acted.org", type: "NGO", regions: ["East Africa", "West Africa", "Central Africa", "MENA", "South Asia", "Central Asia"], sectors: ["Food Security", "WASH", "Shelter", "M&E", "Finance", "HR", "Logistics", "Communications", "Camp Management", "Coordination"] },
+  { name: "ALIGHT (American Refugee Committee)", description: "ALIGHT works with refugees and other displaced persons to find new ways to provide practical solutions in shelter, livelihoods, clean water and sanitation, protection, and health. ALIGHT works in 17 countries across Africa, Asia, and the Middle East.", website: "https://wearealight.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Protection", "WASH", "Health", "Food Security", "M&E", "Finance", "HR", "Communications", "Shelter", "Other"] },
+  { name: "Human Appeal", description: "Human Appeal is a faith-based charity aiming to strengthen humanity's fight against poverty, social injustice, and natural disaster. Human Appeal works in over 25 countries providing emergency relief, development programmes, and advocacy.", website: "https://humanappeal.org.uk", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Food Security", "WASH", "Health", "Education", "M&E", "Finance", "HR", "Communications", "Legal", "Other"] },
+  { name: "Geneva Call", description: "Geneva Call is a neutral and impartial humanitarian organisation dedicated to promoting respect for humanitarian norms by armed non-State actors in armed conflict and other situations of violence. Geneva Call works in over 20 countries.", website: "https://genevacall.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Legal", "Protection", "M&E", "Finance", "HR", "Communications", "Coordination", "Other", "Education", "IT"] },
+  { name: "Translators Without Borders", description: "Translators Without Borders provides language services to support humanitarian efforts worldwide. Through translation, terminology, and communication tools, TWB helps people get the information they need to survive and thrive in their own language.", website: "https://www.translatorswithoutborders.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Global"], sectors: ["Communications", "IT", "M&E", "Finance", "HR", "Legal", "Other", "Coordination", "Education", "Protection"] },
+  { name: "Ground Truth Solutions", description: "Ground Truth Solutions works with organisations to measure and improve accountability to affected people in humanitarian and development settings. GTS specialises in participatory assessment, rapid feedback, and real-time learning.", website: "https://groundtruthsolutions.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia"], sectors: ["M&E", "Communications", "Finance", "HR", "Legal", "IT", "Other", "Coordination", "Protection", "Education"] },
+  { name: "Peace Direct", description: "Peace Direct is an international peacebuilding organisation that supports local peacebuilders in conflict zones around the world. Peace Direct works in over 20 countries, helping local organisations resolve conflicts and build peace from within.", website: "https://www.peacedirect.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia"], sectors: ["Other", "Legal", "M&E", "Finance", "HR", "Communications", "Coordination", "Protection", "Education", "IT"] },
+  { name: "WaterAid", description: "WaterAid is an international organisation focused exclusively on safe water, improved sanitation, and hygiene education for the world's poorest people. WaterAid works in partnership with local organisations in over 25 countries across Africa, Asia, and the Pacific.", website: "https://www.wateraid.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["WASH", "M&E", "Finance", "HR", "Communications", "Legal", "IT", "Coordination", "Other", "Health"] },
+  { name: "Simavi", description: "Simavi believes every person should be able to participate fully in society. In a world where access to clean water, good sanitation, and sexual and reproductive health and rights is denied, women and girls are hit the hardest. Simavi works in 17 countries.", website: "https://simavi.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia"], sectors: ["WASH", "Health", "M&E", "Finance", "HR", "Communications", "Other", "Coordination", "Legal", "Education"] },
+  { name: "Cash Learning Partnership (CaLP)", description: "The Cash Learning Partnership (CaLP) is a global network of humanitarian organisations committed to the effective and appropriate use of cash and voucher assistance in humanitarian response. CaLP operates globally.", website: "https://www.calpnetwork.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "Global", "South Asia"], sectors: ["Finance", "M&E", "Logistics", "IT", "HR", "Communications", "Coordination", "Legal", "Other", "Food Security"] },
+  { name: "Global Partnership for Education (GPE)", description: "GPE is the world's largest global fund for education in developing countries. GPE supports more than 90 partner countries to transform their education systems and ensure all children can access quality education.", website: "https://www.globalpartnership.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Education", "Finance", "M&E", "Communications", "HR", "Legal", "IT", "Coordination", "Other", "Protection"] },
+  { name: "Education Cannot Wait (ECW)", description: "Education Cannot Wait is the UN fund for education in emergencies and protracted crises. ECW mobilises new and additional funding to reach children and youth whose education has been disrupted by conflict and disasters.", website: "https://www.educationcannotwait.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Global"], sectors: ["Education", "Finance", "M&E", "Communications", "HR", "Legal", "Coordination", "Other", "Protection", "IT"] },
+  { name: "iDE (International Development Enterprises)", description: "iDE harnesses the power of market-based solutions to end poverty. iDE creates income and livelihood opportunities for poor rural households in 13 countries across Asia and Africa through market systems, WASH, and agricultural development.", website: "https://www.ideglobal.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia"], sectors: ["Food Security", "WASH", "M&E", "Finance", "HR", "IT", "Communications", "Other", "Coordination", "Logistics"] },
+  { name: "SNV Netherlands Development Organisation", description: "SNV is a mission-driven global development partner working in 26 countries across Africa, Asia, and Latin America. SNV works on agriculture, energy, and WASH, partnering with governments, businesses, and civil society to deliver innovations that matter.", website: "https://snv.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["Food Security", "WASH", "M&E", "Finance", "HR", "Communications", "IT", "Coordination", "Education", "Other"] },
+  { name: "CGIAR", description: "CGIAR is a global research partnership for a food-secure future dedicated to transforming food, land, and water systems in a climate crisis. CGIAR comprises 15 international research centres and conducts research across 70+ countries.", website: "https://www.cgiar.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas", "Europe HQ"], sectors: ["Food Security", "M&E", "Communications", "Finance", "HR", "Legal", "IT", "Coordination", "Education", "Other"] },
+  { name: "ILRI (International Livestock Research Institute)", description: "ILRI works to improve food and nutritional security and reduce poverty in developing countries through research for efficient, safe, and sustainable use of livestock. ILRI has major campuses in Nairobi, Kenya, and Addis Ababa, Ethiopia.", website: "https://www.ilri.org", type: "NGO", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia"], sectors: ["Food Security", "M&E", "Finance", "HR", "IT", "Communications", "Legal", "Coordination", "Other", "Health"] },
+  { name: "IWMI (International Water Management Institute)", description: "IWMI is an international research organisation that seeks to improve the management of water and land resources for food, livelihoods, and nature. IWMI has offices in 12 countries and works across Africa, Asia, and Latin America.", website: "https://www.iwmi.cgiar.org", type: "NGO", regions: ["East Africa", "South Asia", "Southeast Asia", "West Africa"], sectors: ["WASH", "Food Security", "M&E", "Finance", "HR", "IT", "Communications", "Legal", "Coordination", "Other"] },
+
+  // ── IMPLEMENTING PARTNERS & BILATERAL (20) ───────────────────────────────
+  { name: "GIZ (Deutsche Gesellschaft für Internationale Zusammenarbeit)", description: "GIZ offers workable, sustainable, and effective solutions in political, economic, ecological, and social development. A federally owned enterprise, GIZ supports the German Government and international clients in more than 120 countries.", website: "https://www.giz.de", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["Food Security", "Health", "WASH", "M&E", "Finance", "HR", "Communications", "Legal", "IT", "Coordination"] },
+  { name: "Palladium Group", description: "Palladium is a global leader in the design, development, and delivery of positive impact. We work with governments, businesses, and investors to solve the world's most pressing challenges through public-private partnerships and programme management.", website: "https://www.thepalladiumgroup.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Education", "Coordination"] },
+  { name: "DAI Global", description: "DAI is an international development company that makes a lasting difference in the world by helping people improve their lives. We tackle fundamental social and economic development problems with technical solutions that have proven results in more than 100 countries.", website: "https://www.dai.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Finance", "M&E", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Education", "Coordination"] },
+  { name: "Chemonics International", description: "Chemonics is a leading international development consulting firm committed to helping people live healthier, more productive, and more independent lives. We work with partners in more than 70 countries to advance the mission of international development.", website: "https://www.chemonics.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Health", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Education", "Coordination"] },
+  { name: "RTI International", description: "RTI International is an independent, nonprofit research institute providing research, development, and technical services to government and commercial clients worldwide in more than 75 countries. RTI focuses on health, education, social policy, and environment.", website: "https://www.rti.org", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["Health", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Education", "Food Security", "Coordination"] },
+  { name: "Abt Associates", description: "Abt Associates is a mission-driven global development consulting firm with offices in over 40 countries. Abt works in public health and clinical research, social policy, international development, and environment to improve the quality of life for people around the world.", website: "https://www.abtassociates.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Americas", "Global"], sectors: ["Health", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Education", "Coordination"] },
+  { name: "Social Impact Inc.", description: "Social Impact is a global development management consulting firm specialising in monitoring and evaluation, strategic planning, and programme performance management. We work with governments, foundations, and NGOs in over 90 countries.", website: "https://www.socialimpact.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas", "Global"], sectors: ["M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Education", "Coordination"] },
+  { name: "Counterpart International", description: "Counterpart International helps people build better lives and more durable futures. We partner with communities across Africa, Asia, and Latin America to help them reach their development goals through democracy, civil society, food security, and livelihoods work.", website: "https://www.counterpart.org", type: "BILATERAL", regions: ["East Africa", "West Africa", "Central Asia", "South Asia", "Americas"], sectors: ["Food Security", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Education", "Health", "Coordination"] },
+  { name: "Creative Associates International", description: "Creative Associates International is a dynamic, fast-growing global development firm that specialises in education, economic growth, democratic transitions, and stabilisation in post-conflict environments. Creative works in more than 85 countries.", website: "https://www.creativeassociatesinternational.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "Central Asia", "Americas"], sectors: ["Education", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Coordination"] },
+  { name: "Pact Inc.", description: "Pact is an international nonprofit that seeks to enable systemic solutions that allow those who are poor and marginalised to earn a dignified living, be healthy, and take part in the benefits that nature provides. Pact works in 40+ countries.", website: "https://www.pactworld.org", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas"], sectors: ["M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Education", "Coordination"] },
+  { name: "Oxford Policy Management (OPM)", description: "OPM is a leading international development consultancy working across 100+ countries. OPM designs and manages complex programmes to address poverty, inequality, and vulnerability. We specialise in social protection, governance, health, and food security.", website: "https://www.opml.co.uk", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "MENA", "Global"], sectors: ["Finance", "M&E", "Legal", "HR", "IT", "Communications", "Food Security", "Health", "Education", "Coordination"] },
+  { name: "Tetra Tech International Development", description: "Tetra Tech is a leading provider of international development services. Our global team of consultants and technical experts works in water, environment, infrastructure, governance, communications, and fiscal management in over 100 countries.", website: "https://www.tetratech.com/intl-dev", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas"], sectors: ["WASH", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Health", "Coordination"] },
+  { name: "Nathan Associates", description: "Nathan Associates is a private economic consulting firm providing technical assistance on economic growth, trade, and investment in developing countries. Nathan works with USAID, World Bank, and bilateral donors in over 30 countries.", website: "https://www.nathaninc.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Americas"], sectors: ["Finance", "M&E", "Legal", "HR", "IT", "Communications", "Food Security", "Education", "Coordination", "Other"] },
+  { name: "ICF International", description: "ICF International is a global consulting and technology services company delivering high-quality work in health, social programs, technology, energy, environment, and economics. ICF works with governments, NGOs, and businesses in 70+ countries.", website: "https://www.icf.com", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Americas", "Europe HQ"], sectors: ["Health", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Education", "Food Security", "Coordination"] },
+  { name: "USAID", description: "USAID is the world's premier international development agency and a catalytic actor driving development results. USAID works to end extreme poverty and promote resilient, democratic societies while advancing US security and prosperity in over 100 countries.", website: "https://www.usaid.gov", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Southeast Asia", "Americas", "Global"], sectors: ["Health", "Education", "Food Security", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Coordination"] },
+  { name: "Enabel (Belgian Development Agency)", description: "Enabel is the Belgian development agency. In Belgium and abroad, Enabel uses its expertise in development cooperation to build a sustainable world where people live in dignity and security. Enabel is active in 21 countries.", website: "https://www.enabel.be", type: "BILATERAL", regions: ["East Africa", "West Africa", "MENA", "Americas"], sectors: ["Health", "WASH", "Food Security", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Coordination"] },
+  { name: "JICA (Japan International Cooperation Agency)", description: "JICA is the governmental agency that coordinates Official Development Assistance (ODA) for Japan. JICA works to promote economic and social development in developing countries and to contribute to international peace and stability in over 150 countries.", website: "https://www.jica.go.jp", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Americas", "Asia Pacific"], sectors: ["Health", "Education", "WASH", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security"] },
+  { name: "Expertise France", description: "Expertise France is the French public international development cooperation agency. The agency supports partner countries in designing and implementing reform policies and promotes French and European expertise on the international stage.", website: "https://www.expertisefrance.fr", type: "BILATERAL", regions: ["West Africa", "MENA", "Central Asia", "Europe HQ"], sectors: ["Health", "WASH", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Education", "Coordination"] },
+  { name: "KOICA (Korea International Cooperation Agency)", description: "KOICA is a South Korean government agency that manages Korea's bilateral grant aid programme. KOICA implements ODA projects in 50+ partner countries across education, health, agriculture, urban development, and governance.", website: "https://www.koica.go.kr", type: "BILATERAL", regions: ["East Africa", "West Africa", "South Asia", "Southeast Asia", "Asia Pacific", "Americas"], sectors: ["Health", "Education", "M&E", "Finance", "HR", "Legal", "IT", "Communications", "Food Security", "Coordination"] },
+  { name: "International Crisis Group", description: "International Crisis Group is an independent organisation working to prevent wars and shape policies that will build a more peaceful world. ICG sounds the alarm on conflicts through independent field research and high-level advocacy in over 70 countries.", website: "https://www.crisisgroup.org", type: "NGO", regions: ["East Africa", "West Africa", "MENA", "South Asia", "Central Asia", "Europe HQ"], sectors: ["Legal", "Communications", "M&E", "Finance", "HR", "IT", "Coordination", "Other", "Protection", "Education"] },
 ];
 
-function makeJob(
-  organizationIndex: number,
-  title: string,
-  sector: string,
-  location: string,
-  employmentType: string,
-  deadline: string,
-  description: string,
-) {
-  return {
-    organizationIndex,
-    title,
-    sector,
-    location,
-    employment_type: employmentType,
-    deadline,
-    description,
-  };
+// ── RANDOM UTILITIES ──────────────────────────────────────────────────────────
+let _seed = 42;
+function seededRand(): number {
+  _seed = (_seed * 1664525 + 1013904223) & 0xffffffff;
+  return Math.abs(_seed) / 0x80000000;
+}
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(seededRand() * arr.length)];
+}
+function randInt(min: number, max: number): number {
+  return Math.floor(seededRand() * (max - min + 1)) + min;
+}
+function futureDate(daysMin: number, daysMax: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + randInt(daysMin, daysMax));
+  return d.toISOString().split("T")[0];
 }
 
-const jobTemplates = [
-  // ── UNHCR Kenya (0) ──────────────────────────────────────────────────────
-  makeJob(0, "Senior Protection Officer", "Protection", "Nairobi, Kenya", "Full-time", "2026-04-30",
-    `OVERVIEW
-UNHCR Kenya is seeking a Senior Protection Officer to lead refugee protection operations across the Dadaab refugee complex, one of the world's largest refugee hosting areas. The incumbent will supervise protection staff, manage partnerships, and ensure that UNHCR's protection mandate is fulfilled in line with international refugee law and UNHCR's standards.
-
-KEY RESPONSIBILITIES
-• Lead and supervise a protection team of 12 staff members across multiple field locations
-• Coordinate registration, refugee status determination (RSD), and documentation processes
-• Develop and implement the Annual Protection Plan in line with country and regional priorities
-• Ensure systematic monitoring of protection risks including sexual and gender-based violence (SGBV)
-• Represent UNHCR in protection coordination forums and with government counterparts
-• Identify, document, and refer persons with specific needs (PSN) to appropriate services
-• Ensure protection mainstreaming across all UNHCR and partner programmes
-• Prepare high-quality protection reports, situation reports, and donor updates
-• Support durable solutions planning including voluntary repatriation, local integration, and resettlement
-
-REQUIRED QUALIFICATIONS
-• Advanced university degree (Master's or equivalent) in Law, International Relations, Political Science, or Social Science
-• Minimum 8 years of relevant professional experience in refugee protection or related area
-• Extensive knowledge of international refugee and human rights law
-• Proven experience in RSD and resettlement processing
-• Strong analytical, leadership, and interpersonal skills
-• Excellent written and spoken English; knowledge of Somali or Swahili an asset
-
-PREFERRED QUALIFICATIONS
-• Prior experience with UNHCR or other UN agency in a similar position
-• Experience working in complex humanitarian emergency operations
-• Knowledge of the East Africa refugee situation
-
-WHAT WE OFFER
-• Competitive UN salary and benefits package (NOB/P3 equivalent)
-• Comprehensive health and life insurance coverage
-• 30 days of annual leave
-• Access to UNHCR's global learning and development programmes`),
-
-  makeJob(0, "Field Associate – Registration", "Protection", "Dadaab, Kenya", "Full-time", "2026-05-15",
-    `OVERVIEW
-UNHCR Kenya is recruiting a Field Associate for the Registration Unit in Dadaab. The Field Associate will support the registration, documentation, and data management of refugees and asylum seekers, ensuring accuracy and confidentiality of biometric and case data in UNHCR's proGres database.
-
-KEY RESPONSIBILITIES
-• Conduct individual and family registration interviews for newly arrived refugees and asylum seekers
-• Capture and verify biometric data (fingerprints and iris scans) using UNHCR registration tools
-• Update and maintain accurate data in proGres v4 / PRIMES registration database
-• Issue and replace documentation including refugee certificates and attestation letters
-• Liaise with protection, community services, and implementing partners on case management
-• Identify and immediately refer persons with specific needs for priority services
-• Conduct community outreach to explain registration processes and entitlements
-• Prepare daily and weekly registration statistics and activity reports
-
-REQUIRED QUALIFICATIONS
-• University degree in Social Science, Law, Information Management, or related field
-• Minimum 3 years experience in refugee operations, registration, or case management
-• Strong computer skills including MS Office and database management
-• High attention to detail and ability to maintain confidentiality
-• Knowledge of Somali or other languages spoken by refugee communities is a strong advantage
-
-WHAT WE OFFER
-• UNHCR salary scale (G-5 equivalent) with full benefits
-• Hazard pay allowance for field duty station
-• 30 days annual leave + public holidays`),
-
-  makeJob(0, "Livelihoods and Economic Inclusion Officer", "Food Security", "Kakuma, Kenya", "Full-time", "2026-06-01",
-    `OVERVIEW
-UNHCR Kenya seeks a Livelihoods and Economic Inclusion Officer to design and implement livelihood interventions for refugees in Kakuma. The role supports refugees in achieving self-reliance through market-based livelihoods, financial inclusion, and skills development programmes.
-
-KEY RESPONSIBILITIES
-• Design, implement and monitor livelihoods programmes for refugees and host communities
-• Conduct labour market assessments and value chain analyses to identify sustainable livelihoods opportunities
-• Develop financial inclusion strategies in partnership with microfinance institutions and mobile money providers
-• Engage private sector partners to facilitate refugee employment and apprenticeship opportunities
-• Support refugees in establishing and scaling micro and small enterprises
-• Coordinate with education, protection, and WASH colleagues on integrated programming
-• Monitor programme implementation against output and outcome indicators
-• Prepare donor reports, programme updates, and briefing notes
-
-REQUIRED QUALIFICATIONS
-• University degree (Master's preferred) in Economics, Business Administration, International Development, or related field
-• Minimum 5 years experience in livelihoods, economic development, or private sector engagement
-• Strong understanding of market systems development and value chain approaches
-• Experience working with vulnerable and displaced populations
-• Excellent analytical and report writing skills
-
-WHAT WE OFFER
-• Competitive UNHCR NOA/P2 salary scale and benefits
-• Supportive team environment and structured mentoring
-• International exposure and career growth opportunities`),
-
-  // ── UNICEF Kenya (1) ─────────────────────────────────────────────────────
-  makeJob(1, "Health Specialist – Immunization", "Health", "Nairobi, Kenya", "Full-time", "2026-04-25",
-    `OVERVIEW
-UNICEF Kenya is seeking a Health Specialist with expertise in immunization to support Kenya's Expanded Programme on Immunization (KEPI). The Health Specialist will provide technical assistance to the Ministry of Health to increase routine immunization coverage, strengthen cold chain systems, and respond to vaccine-preventable disease outbreaks.
-
-KEY RESPONSIBILITIES
-• Provide technical support to the Ministry of Health Division of National Vaccines and Immunization Programme
-• Support development and implementation of the Kenya Immunization Action Plan (KIAP)
-• Coordinate cold chain equipment procurement, installation, and maintenance planning
-• Manage and monitor UNICEF immunization programme budgets and grants
-• Facilitate social mobilization and community engagement campaigns for immunization
-• Support outbreak response planning and implementation for vaccine-preventable diseases
-• Prepare donor proposals, programme documents, situation reports, and progress reports
-• Build capacity of county and sub-county health teams on immunization data management
-• Represent UNICEF in immunization technical working groups and inter-agency meetings
-
-REQUIRED QUALIFICATIONS
-• Advanced university degree in Medicine, Public Health, or related medical field
-• Minimum 5 years of professional experience in public health or immunization programme management
-• Strong knowledge of immunization systems, cold chain, and vaccine management
-• Experience in developing country or humanitarian contexts
-• Excellent analytical, communication, and interpersonal skills
-• Fluency in English required; knowledge of Swahili an advantage
-
-WHAT WE OFFER
-• UNICEF NOB/P3 salary and comprehensive benefits package
-• International exposure and networking with global health leaders
-• Flexible and inclusive work environment`),
-
-  makeJob(1, "Education Officer – Learning Recovery", "Education", "Mombasa, Kenya", "Full-time", "2026-05-20",
-    `OVERVIEW
-UNICEF Kenya's Education Section seeks an Education Officer to support learning recovery programmes in coastal Kenya, specifically in Mombasa and Kilifi counties. The Education Officer will work with county governments, teachers, and communities to address learning losses and improve the quality of foundational learning.
-
-KEY RESPONSIBILITIES
-• Support implementation of the Kenya Learning Recovery Programme with focus on foundational literacy and numeracy
-• Coordinate teacher training and support activities with county education departments
-• Monitor programme implementation and collect data on learning outcomes
-• Support development of low-cost teaching and learning materials
-• Facilitate community engagement and school management committee strengthening
-• Coordinate with NGO partners implementing education activities in the zone
-• Prepare programme reports, donor updates, and case studies
-• Represent UNICEF in county-level education coordination forums
-
-REQUIRED QUALIFICATIONS
-• University degree in Education, Social Sciences, or related field (Master's preferred)
-• Minimum 3 years experience in education programme management or teaching
-• Strong understanding of Kenya's education system and curriculum
-• Experience in data collection, analysis, and report writing
-• Good communication and facilitation skills
-• Proficiency in English and Swahili
-
-WHAT WE OFFER
-• UNICEF NO-A/P-2 salary scale and full UN benefits
-• Professional development and learning opportunities
-• Supportive team culture with a focus on results`),
-
-  makeJob(1, "Child Protection Officer – GBV Prevention", "Protection", "Nairobi, Kenya", "Full-time", "2026-06-10",
-    `OVERVIEW
-UNICEF Kenya's Child Protection Section is looking for a dedicated Child Protection Officer to strengthen GBV prevention and response systems for children in Kenya. The incumbent will support the Government of Kenya and civil society partners to deliver quality case management, community-based prevention, and social norm change programming.
-
-KEY RESPONSIBILITIES
-• Support implementation of Kenya's National Action Plan on GBV and Child Protection
-• Provide technical assistance to child protection case management systems
-• Coordinate community-based psychosocial support programming for GBV survivors
-• Support development and rollout of social norms change communication campaigns
-• Monitor partner performance and provide on-the-job coaching and mentorship
-• Compile and analyse child protection data and prepare regular sector reports
-• Represent UNICEF in child protection sub-cluster and inter-agency coordination meetings
-• Contribute to resource mobilization by developing concept notes and proposals
-
-REQUIRED QUALIFICATIONS
-• University degree in Social Work, Law, Child Development, or related field
-• Minimum 3 years of experience in child protection or GBV programming
-• Knowledge of case management standards, referral pathways, and survivor-centred approaches
-• Excellent communication, networking, and partnership management skills
-• Proficiency in English required; Swahili an asset
-
-WHAT WE OFFER
-• UNICEF salary and benefits package
-• Mentorship and career development within UNICEF's global network
-• Meaningful work at the forefront of children's rights`),
-
-  // ── WFP Kenya (2) ────────────────────────────────────────────────────────
-  makeJob(2, "Programme Policy Officer – Nutrition", "Nutrition", "Nairobi, Kenya", "Full-time", "2026-05-05",
-    `OVERVIEW
-WFP Kenya's Nutrition team is seeking a Programme Policy Officer to lead nutrition-sensitive programming and support the Government of Kenya on stunting reduction and acute malnutrition response. The role involves designing, managing, and evaluating nutrition interventions integrated within food assistance programming.
-
-KEY RESPONSIBILITIES
-• Lead design and implementation of integrated acute malnutrition management (IMAM) and nutrition-sensitive programmes
-• Develop annual programme plans, budgets, and implementation frameworks for nutrition activities
-• Provide technical guidance on infant and young child feeding (IYCF) and micronutrient supplementation
-• Coordinate nutrition surveys, SMART surveys, and programme evaluations
-• Support government counterparts in county nutrition action plans and budget advocacy
-• Analyse nutrition data and produce evidence-based programme recommendations
-• Prepare donor proposals, situational analyses, and programme progress reports
-• Participate in Nutrition Sector coordination meetings and technical working groups
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Nutrition, Public Health, Food Science, or related field
-• Minimum 5 years of professional experience in nutrition programming
-• Strong technical knowledge of CMAM, IMAM, and community nutrition programming
-• Experience in humanitarian and development contexts
-• Strong data analysis skills; proficiency in SPSS, STATA, or ENA for SMART
-• Excellent English writing and communication skills
-
-WHAT WE OFFER
-• WFP NOB/FT salary scale with competitive benefits
-• Exposure to WFP's global systems and technical expertise
-• Vibrant Nairobi duty station with regional connectivity`),
-
-  makeJob(2, "Supply Chain Officer", "Logistics", "Mombasa, Kenya", "Full-time", "2026-05-30",
-    `OVERVIEW
-WFP Kenya is seeking an experienced Supply Chain Officer based in Mombasa to manage food commodity procurement, storage, and logistics for WFP's Kenya operations. Mombasa is a critical transit hub for WFP's East Africa regional supply chain.
-
-KEY RESPONSIBILITIES
-• Manage procurement of food commodities and logistics services in line with WFP procurement policies
-• Oversee port clearance, loading, and inland transport of food commodities from Mombasa port
-• Manage relationships with contracted transporters, warehouse operators, and clearing agents
-• Monitor commodity tracking systems (LESS/COMET) and ensure accurate stock records
-• Conduct supplier performance assessments and market price monitoring
-• Identify and address supply chain risks including pilferage, quality issues, and bottlenecks
-• Prepare supply chain reports, dashboards, and management briefings
-• Coordinate with cooperating partners on commodity dispatch and distribution monitoring
-
-REQUIRED QUALIFICATIONS
-• University degree in Supply Chain Management, Logistics, Business Administration, or related field
-• Minimum 5 years experience in supply chain, logistics, or procurement management
-• Familiarity with UN or large INGO procurement policies and procedures
-• Strong analytical and problem-solving skills
-• Excellent MS Excel skills; experience with ERP systems an advantage
-• Willingness to travel to field locations
-
-WHAT WE OFFER
-• WFP salary and full benefits
-• Exposure to one of the world's largest humanitarian supply chains
-• Professional growth in a global organisation`),
-
-  // ── WHO Kenya (3) ────────────────────────────────────────────────────────
-  makeJob(3, "Epidemiologist – Outbreak Response", "Health", "Nairobi, Kenya", "Full-time", "2026-04-20",
-    `OVERVIEW
-WHO Kenya is recruiting an Epidemiologist to support disease surveillance, outbreak investigation, and emergency health response. The Epidemiologist will work within Kenya's Health Emergency Preparedness and Response programme to strengthen early warning systems and rapid response capacity.
-
-KEY RESPONSIBILITIES
-• Conduct surveillance data analysis and produce weekly epidemiological bulletins
-• Lead outbreak investigation teams during disease alerts and public health emergencies
-• Strengthen Kenya's Integrated Disease Surveillance and Response (IDSR) system
-• Build capacity of county surveillance officers on case detection and reporting
-• Develop outbreak response plans, investigation protocols, and after-action reviews
-• Coordinate with ECDC, CDC, and other partners on surveillance data sharing
-• Support development of WHO country office emergency preparedness and response plans
-• Represent WHO in interagency health cluster and emergency coordination meetings
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Epidemiology, Public Health, Medicine, or related field
-• Minimum 5 years of experience in field epidemiology, outbreak investigation, or health surveillance
-• Demonstrated experience in outbreak response in developing countries
-• Strong statistical analysis skills (Epi Info, R, or STATA)
-• Experience in applying the International Health Regulations (IHR 2005)
-• Excellent English communication skills; Swahili beneficial
-
-WHAT WE OFFER
-• WHO salary scale (P3 or equivalent) with comprehensive benefits
-• Unique public health leadership role in East Africa
-• Contribution to Africa's health security agenda`),
-
-  makeJob(3, "WASH and Environmental Health Officer", "WASH", "Nairobi, Kenya", "Contract", "2026-05-10",
-    `OVERVIEW
-WHO Kenya's Health Emergency team seeks a WASH and Environmental Health Officer to improve water, sanitation and hygiene standards in health facilities and emergency-affected areas in Kenya. The officer will coordinate WASH in health facilities assessments and support cholera response and prevention.
-
-KEY RESPONSIBILITIES
-• Lead WASH in Health Care Facilities (WinHCF) assessments across target counties
-• Develop standards and protocols for environmental health in humanitarian settings
-• Support cholera response by designing and supervising safe water supply and sanitation interventions
-• Train health workers on environmental health and infection prevention and control (IPC)
-• Coordinate with MoH, UNICEF, and other WASH sector partners
-• Conduct monitoring visits to health facilities and field project sites
-• Prepare technical reports, guidance documents, and capacity building materials
-
-REQUIRED QUALIFICATIONS
-• University degree in Environmental Health, WASH Engineering, Public Health, or related field
-• Minimum 4 years of experience in WASH programming, preferably in humanitarian or low-resource settings
-• Technical knowledge of water quality, sanitation design, and hygiene promotion
-• Experience in health facility WASH assessments
-• Good report writing and communication skills
-
-WHAT WE OFFER
-• WHO salary scale (NO-B or G-7 equivalent) with benefits
-• Travel opportunities across Kenya
-• Professional development in global health`),
-
-  // ── IOM Kenya (4) ────────────────────────────────────────────────────────
-  makeJob(4, "Migration Health Officer", "Health", "Nairobi, Kenya", "Full-time", "2026-05-01",
-    `OVERVIEW
-IOM Kenya's Migration Health Division is seeking a Migration Health Officer to manage pre-departure medical examinations for refugees being resettled to third countries, and to support public health programming for migrant populations in Kenya.
-
-KEY RESPONSIBILITIES
-• Manage IOM Migration Health Assessment Centres (MHAC) operations in Nairobi
-• Oversee pre-departure health examinations, TB screening, and vaccinations for departing refugees
-• Coordinate with resettlement countries' embassies and health authorities on case clearance
-• Supervise health assessment staff and contracted medical facilities
-• Manage health data systems and ensure timely, accurate reporting to embassies and IOM headquarters
-• Conduct quality assurance audits of health assessment processes
-• Support emergency health response for migrants and displaced populations
-• Prepare donor reports and briefings on migration health programme progress
-
-REQUIRED QUALIFICATIONS
-• University degree in Medicine, Nursing, or Public Health (advanced degree preferred)
-• Minimum 3 years experience in public health, migration health, or clinical services
-• Experience in managing health teams and clinical facilities
-• Strong data management and reporting skills
-• Excellent written and verbal English; Swahili an asset
-
-WHAT WE OFFER
-• IOM salary scale with full benefits package
-• Unique exposure to resettlement and migration health operations
-• Dynamic multicultural work environment`),
-
-  makeJob(4, "Displacement Tracking Matrix (DTM) Data Officer", "M&E", "Garissa, Kenya", "Full-time", "2026-06-15",
-    `OVERVIEW
-IOM Kenya's Displacement Tracking Matrix (DTM) programme is looking for a Data Officer based in Garissa to collect, analyse, and report on population displacement dynamics in North-Eastern Kenya. The DTM Data Officer will manage field assessment teams and oversee data quality.
-
-KEY RESPONSIBILITIES
-• Design and implement DTM data collection tools and methodologies for mobility tracking and site assessment
-• Manage and train a team of field enumerators deployed across displacement-affected areas
-• Oversee data entry, cleaning, and validation processes
-• Produce weekly, monthly, and ad hoc displacement situation reports and dashboards
-• Maintain a comprehensive database of displacement sites and population figures
-• Coordinate with UNHCR, OCHA, and county governments on displacement data sharing
-• Support emergency assessments during sudden-onset displacement crises
-• Contribute to regional DTM data products and analysis
-
-REQUIRED QUALIFICATIONS
-• University degree in Statistics, Social Sciences, Information Management, or related field
-• Minimum 3 years of experience in data collection, management, and analysis in humanitarian contexts
-• Proficiency in Kobo Toolbox, ODK, or similar data collection platforms
-• Strong skills in Excel, Power BI, or Tableau for data visualisation
-• Experience in managing field teams in remote locations
-• Willingness to travel frequently within Garissa and to other field sites
-
-WHAT WE OFFER
-• IOM salary scale with allowances for field duty station
-• Professional development in humanitarian information management
-• Exposure to IOM's global DTM network`),
-
-  // ── UNDP Kenya (5) ───────────────────────────────────────────────────────
-  makeJob(5, "Climate Change Adaptation Specialist", "Coordination", "Nairobi, Kenya", "Full-time", "2026-05-25",
-    `OVERVIEW
-UNDP Kenya's Climate and Environment team is recruiting a Climate Change Adaptation Specialist to lead Kenya's National Adaptation Planning (NAP) process and design climate-resilient programmes for vulnerable counties. The specialist will work closely with the Ministry of Environment and Climate Change.
-
-KEY RESPONSIBILITIES
-• Lead technical support to Kenya's National Adaptation Plan (NAP) development and implementation
-• Design and appraise adaptation projects for Green Climate Fund (GCF), Adaptation Fund, and other climate financing
-• Coordinate climate risk and vulnerability assessments for priority sectors and counties
-• Build capacity of government ministries and county governments on climate mainstreaming
-• Facilitate stakeholder consultations and multi-stakeholder climate platforms
-• Prepare technical reports, policy briefs, and programme documentation
-• Support resource mobilization for adaptation programming
-• Represent UNDP in national and international climate forums
-
-REQUIRED QUALIFICATIONS
-• Master's degree in Environmental Science, Climate Science, Development Economics, or related field
-• Minimum 7 years of experience in climate change adaptation, environmental management, or sustainable development
-• Strong knowledge of climate financing mechanisms (GCF, Adaptation Fund, LDCF)
-• Experience in project design, management, and evaluation
-• Excellent communication and policy engagement skills
-
-WHAT WE OFFER
-• UNDP NOC/P4 salary scale with comprehensive benefits
-• Leadership role in Kenya's climate change response
-• Opportunity to shape national policy and access to global UNDP networks`),
-
-  // ── OCHA Kenya (6) ───────────────────────────────────────────────────────
-  makeJob(6, "Humanitarian Affairs Officer – Information Management", "M&E", "Nairobi, Kenya", "Full-time", "2026-04-15",
-    `OVERVIEW
-OCHA Kenya is seeking a Humanitarian Affairs Officer with information management expertise to support situational awareness and data-driven decision making in Kenya's humanitarian response. The officer will coordinate with clusters, UN agencies, and NGOs to ensure timely, accurate humanitarian data products.
-
-KEY RESPONSIBILITIES
-• Design and maintain OCHA Kenya's information management products including Who Does What Where (3W), response monitoring dashboards, and needs assessments
-• Coordinate with cluster information management officers to harmonise data standards and reporting
-• Produce Kenya Humanitarian Overview, situation reports, and flash updates
-• Manage the Kenya Humanitarian Data Exchange (HDX) profile and dissemination
-• Support rapid needs assessments and inter-agency emergency monitoring
-• Train partners on data collection tools and humanitarian data standards
-• Coordinate geographic information systems (GIS) mapping and spatial analysis
-
-REQUIRED QUALIFICATIONS
-• Advanced university degree in Information Management, Statistics, Geography, or Social Sciences
-• Minimum 5 years of relevant experience in humanitarian information management
-• Expertise in data visualisation tools (Power BI, Tableau, Flourish)
-• Strong GIS skills (QGIS or ArcGIS)
-• Experience in the Humanitarian Programme Cycle (HNA, HRP, 3W)
-• Excellent English writing and communication skills
-
-WHAT WE OFFER
-• OCHA NOB/P3 salary and UN benefits
-• Exposure to Kenya's humanitarian leadership community
-• Fast-paced, high-impact work environment`),
-
-  // ── UN Women Kenya (7) ───────────────────────────────────────────────────
-  makeJob(7, "Women Economic Empowerment Programme Officer", "Food Security", "Nairobi, Kenya", "Full-time", "2026-05-15",
-    `OVERVIEW
-UN Women Kenya's Economic Empowerment team seeks a Programme Officer to design and implement women's economic empowerment interventions. The officer will manage partnerships with government, the private sector, and civil society to expand women's access to decent work, entrepreneurship, and financial services.
-
-KEY RESPONSIBILITIES
-• Design and implement women's economic empowerment programmes targeting rural and urban women
-• Manage partnerships with financial institutions, private sector companies, and government agencies
-• Coordinate and monitor grants to women's rights organizations and cooperatives
-• Develop training curricula and materials on financial literacy, entrepreneurship, and leadership
-• Facilitate dialogues with private sector on gender-responsive procurement and employment practices
-• Monitor programme results against logframes and collect data for reporting
-• Contribute to resource mobilization and donor reporting
-• Represent UN Women in women's economic empowerment coordination forums
-
-REQUIRED QUALIFICATIONS
-• University degree in Economics, Development Studies, Gender Studies, or related field
-• Minimum 3 years of experience in women's economic empowerment, gender and development, or related area
-• Strong understanding of gender mainstreaming and feminist approaches
-• Experience in programme management, partnership coordination, and reporting
-• Excellent writing and presentation skills
-
-WHAT WE OFFER
-• UN Women NOA/P2 salary and benefits
-• Opportunity to advance gender equality and women's rights in Kenya
-• Dynamic team committed to transformative change`),
-
-  // ── FAO Kenya (8) ────────────────────────────────────────────────────────
-  makeJob(8, "Food Security and Livelihoods Officer", "Food Security", "Nairobi, Kenya", "Full-time", "2026-05-20",
-    `OVERVIEW
-FAO Kenya is recruiting a Food Security and Livelihoods Officer to manage the Emergency Livelihoods Restoration programme in ASAL counties. The officer will lead cash-based interventions, livestock support, and agricultural input assistance targeting drought-affected smallholder farmers and pastoralists.
-
-KEY RESPONSIBILITIES
-• Design and implement emergency livelihood and food security interventions in drought-affected counties
-• Lead multi-purpose cash transfer programming in partnership with government and NGOs
-• Coordinate livestock offtake, restocking, and veterinary support activities
-• Conduct food security and early warning analysis using IPC and NDVI data
-• Manage partner NGOs and cooperating partners under FAO sub-agreements
-• Monitor programme output and outcome indicators and prepare donor reports
-• Facilitate farmer field school (FFS) activities and climate-smart agriculture demonstrations
-• Participate in the Food Security Sector (FSS) coordination and technical working groups
-
-REQUIRED QUALIFICATIONS
-• University degree in Agriculture, Food Security, Rural Development, or related field
-• Minimum 5 years of experience in food security, livelihoods, or agricultural development
-• Strong experience with cash transfer programming and market systems in humanitarian contexts
-• Knowledge of IPC analysis and ASAL livelihoods systems in Kenya
-• Excellent data analysis and report writing skills
-
-WHAT WE OFFER
-• FAO salary scale (NOB/P3) with full benefits
-• Field exposure across Kenya's ASAL counties
-• Contribution to Kenya's food system resilience`),
-
-  // ── ILO Kenya (9) ────────────────────────────────────────────────────────
-  makeJob(9, "Youth Employment Specialist", "HR", "Nairobi, Kenya", "Full-time", "2026-06-01",
-    `OVERVIEW
-ILO Kenya is seeking a Youth Employment Specialist to lead the Kenya Youth Employment Programme (KYEP), supporting young women and men to access decent work opportunities through skills development, entrepreneurship, and labour market reform advocacy.
-
-KEY RESPONSIBILITIES
-• Lead design and implementation of youth employment programmes aligned with ILO's Decent Work Agenda
-• Coordinate with the Ministry of Labour, TVET institutions, and private sector employers
-• Develop apprenticeship frameworks and employer engagement strategies
-• Manage programme budgets, work plans, and monitoring and evaluation frameworks
-• Conduct labour market assessments and youth employment diagnostics
-• Facilitate social dialogue between government, employers, and workers on youth employment policies
-• Prepare programme reports, policy briefs, and communications products
-• Represent ILO in national youth employment forums and UN inter-agency bodies
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Economics, Development Studies, Labour Relations, or related field
-• Minimum 7 years of experience in employment programming, skills development, or labour market policy
-• Strong knowledge of Kenya's labour market, TVET system, and youth challenges
-• Experience in managing multi-partner development programmes
-• Excellent analytical, communication, and facilitation skills
-
-WHAT WE OFFER
-• ILO NOB/P3 salary scale with full benefits
-• Central role in shaping youth employment policy in Kenya
-• Access to ILO's global knowledge and technical expertise`),
-
-  // ── Save the Children Kenya (10) ─────────────────────────────────────────
-  makeJob(10, "Child Protection Coordinator", "Protection", "Dadaab, Kenya", "Full-time", "2026-05-01",
-    `OVERVIEW
-Save the Children Kenya is looking for an experienced Child Protection Coordinator to lead CP programming in Dadaab refugee camp. The role involves managing a team of case workers and social workers, ensuring quality case management services for unaccompanied and separated children (UASC) and survivors of violence and exploitation.
-
-KEY RESPONSIBILITIES
-• Oversee all child protection case management services including UASC family tracing and reunification (FTR)
-• Supervise and provide technical support to a team of 10 case workers and community volunteers
-• Ensure safe programming standards and accountability to affected populations (AAP) mechanisms are in place
-• Coordinate with UNHCR, UNICEF, and other CP sub-cluster members on case referrals
-• Conduct regular case audits and individual supervision sessions with case workers
-• Manage programme budgets and ensure proper financial accountability
-• Prepare monthly programme reports, donor updates, and case studies
-• Represent Save the Children in CP Sub-Cluster and inter-agency coordination forums
-
-REQUIRED QUALIFICATIONS
-• Degree in Social Work, Psychology, Child Development, or related field
-• Minimum 4 years experience in child protection case management
-• Knowledge of CPIMS+, PRIMERO, or similar case management systems
-• Experience working with UASC and GBV survivors
-• Strong supervision, coaching, and team management skills
-• Fluency in English and Somali or Swahili strongly preferred
-
-WHAT WE OFFER
-• Competitive NGO salary and benefits
-• Save the Children staff wellbeing and mental health support package
-• Career development opportunities within a global network`),
-
-  makeJob(10, "Education in Emergencies (EiE) Officer", "Education", "Turkana, Kenya", "Full-time", "2026-06-10",
-    `OVERVIEW
-Save the Children Kenya is recruiting an Education in Emergencies (EiE) Officer for Turkana county. The EiE Officer will implement quality learning programmes in pastoralist and crisis-affected communities, including accelerated education, school feeding linkages, and teacher support.
-
-KEY RESPONSIBILITIES
-• Implement accelerated education and early childhood development (ECD) programmes in target schools
-• Coordinate with county education departments on teacher deployment and support
-• Train and mentor teachers on child-friendly and psychosocial support-integrated teaching methods
-• Monitor learning outcomes and school attendance using standardized assessment tools
-• Distribute scholastic materials, school-in-a-box kits, and recreational materials
-• Facilitate school water access and WASH improvements in partnership with WASH team
-• Prepare programme reports and case studies highlighting child learning outcomes
-
-REQUIRED QUALIFICATIONS
-• Degree in Education, Community Development, or related field
-• Minimum 3 years experience in education programme implementation
-• Knowledge of Kenya's CBC curriculum and EiE minimum standards (INEE)
-• Experience in pastoralist or ASAL community contexts
-• Good Swahili and English communication skills
-
-WHAT WE OFFER
-• Competitive salary and benefits
-• Comprehensive induction and Save the Children's learning culture
-• Career development and internal mobility opportunities`),
-
-  // ── Oxfam Kenya (11) ─────────────────────────────────────────────────────
-  makeJob(11, "WASH Programme Manager", "WASH", "Turkana, Kenya", "Full-time", "2026-05-10",
-    `OVERVIEW
-Oxfam Kenya is seeking an experienced WASH Programme Manager to lead water, sanitation, and hygiene interventions in Turkana county. The WASH Manager will oversee engineering, hygiene promotion, and community-based water management components.
-
-KEY RESPONSIBILITIES
-• Lead design, implementation, and monitoring of WASH programmes including borehole rehabilitation, piped water systems, and latrine construction
-• Supervise a multidisciplinary WASH team of engineers, hygiene promoters, and community mobilisers
-• Manage WASH programme budget and ensure value for money
-• Oversee procurement of WASH supplies and services in compliance with Oxfam procedures
-• Facilitate establishment and capacity building of community water management committees
-• Coordinate with county government WASH department and other WASH partners
-• Prepare technical designs, BOQs, and engineering standards
-• Contribute to proposal development and donor reporting
-
-REQUIRED QUALIFICATIONS
-• Degree in Civil Engineering, Hydrogeology, Public Health Engineering, or related field
-• Minimum 5 years of WASH programme management experience in humanitarian or development contexts
-• Proven ability to manage multi-disciplinary teams and large programme budgets
-• Technical expertise in borehole drilling, water system design, and sanitation engineering
-• Experience in community-led total sanitation (CLTS) and hygiene promotion
-• Good English and Swahili communication skills
-
-WHAT WE OFFER
-• Oxfam competitive salary and benefits package
-• Commitment to staff wellbeing and gender inclusion
-• Collaborative and values-driven organisational culture`),
-
-  makeJob(11, "Gender and Protection Advisor", "Protection", "Nairobi, Kenya", "Full-time", "2026-06-05",
-    `OVERVIEW
-Oxfam Kenya is hiring a Gender and Protection Advisor to lead gender mainstreaming, protection risk analysis, and SGBV prevention across all Oxfam Kenya programmes. The Advisor will provide technical support to programme teams and build staff and partner capacity on gender and protection standards.
-
-KEY RESPONSIBILITIES
-• Conduct gender and protection analyses and develop gender action plans for all Oxfam Kenya programmes
-• Provide technical oversight of women's rights and protection programming
-• Build capacity of programme staff and partners on gender mainstreaming, SGBV prevention, and survivor-centred approaches
-• Lead Oxfam's participation in the GBV Sub-Cluster and Protection Sector coordination
-• Develop advocacy messages and position papers on gender equality in Kenya
-• Support design of gender-transformative interventions and theories of change
-• Prepare gender-sensitive programme reports and donor briefings
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Gender Studies, Social Sciences, Development Studies, or related field
-• Minimum 6 years of experience in gender programming, SGBV prevention, or women's rights
-• Strong understanding of feminist frameworks and gender-transformative programming
-• Knowledge of protection standards (SPHERE, IASC guidelines on GBV)
-• Excellent analytical, writing, and facilitation skills
-
-WHAT WE OFFER
-• Oxfam salary and benefits with flexible working options
-• Organisational commitment to feminist principles
-• High-profile technical advisory role`),
-
-  // ── MSF Kenya (12) ────────────────────────────────────────────────────────
-  makeJob(12, "Medical Doctor – Emergency Response", "Health", "Nairobi, Kenya", "Full-time", "2026-04-25",
-    `OVERVIEW
-MSF Kenya is seeking a Medical Doctor for emergency field deployments across Kenya and the East Africa region. The Medical Doctor will provide direct clinical care and support MSF's emergency medical interventions, including cholera response, kala-azar treatment, and trauma care.
-
-KEY RESPONSIBILITIES
-• Provide direct clinical care to patients in MSF health facilities and emergency response settings
-• Supervise clinical staff including clinical officers, nurses, and community health workers
-• Implement MSF medical protocols for priority diseases (cholera, malaria, kala-azar, TB, malnutrition)
-• Conduct ward rounds, clinical audits, and mortality reviews
-• Support medical data collection, HMIS reporting, and analysis of health indicators
-• Train and mentor national medical staff on clinical management protocols
-• Participate in emergency preparedness and rapid response planning
-• Represent MSF in health cluster meetings during responses
-
-REQUIRED QUALIFICATIONS
-• Medical degree (MBChB or equivalent); additional clinical training an asset
-• Minimum 2 years clinical experience; experience in tropical medicine strongly preferred
-• Readiness to be deployed to remote field locations at short notice
-• Ability to work in high-pressure environments with limited resources
-• Fluent in English; French or Somali an advantage
-
-WHAT WE OFFER
-• MSF salary commensurate with experience plus field allowances
-• Return flights, housing, and medical coverage during assignments
-• Unique frontline humanitarian medical experience in East Africa`),
-
-  // ── IRC Kenya (13) ────────────────────────────────────────────────────────
-  makeJob(13, "Economic Recovery and Development (ERD) Manager", "Food Security", "Kakuma, Kenya", "Full-time", "2026-05-20",
-    `OVERVIEW
-IRC Kenya is recruiting an ERD Manager to lead economic recovery and livelihoods programming for refugees and host communities in Kakuma. The ERD Manager will design and oversee market-systems-based interventions, financial inclusion, and small business development programming.
-
-KEY RESPONSIBILITIES
-• Develop and manage IRC's economic recovery programme portfolio in Kakuma
-• Design market-based livelihoods interventions using the Making Markets Work for the Poor (M4P) approach
-• Manage a team of ERD officers, business development facilitators, and community mobilisers
-• Establish and manage cash transfer programming targeting vulnerable households
-• Develop financial literacy training curricula and oversee implementation
-• Build partnerships with banks, MFIs, and mobile money providers for refugee financial inclusion
-• Conduct market assessments and value chain analyses
-• Prepare donor reports, proposals, and programme documents
-
-REQUIRED QUALIFICATIONS
-• Degree in Economics, Business Administration, Development Studies, or related field (Master's preferred)
-• Minimum 5 years experience in livelihoods, economic development, or cash programming
-• Strong knowledge of market systems development approaches
-• Experience managing large teams and complex programme budgets
-• Excellent analytical and writing skills
-
-WHAT WE OFFER
-• IRC competitive salary plus benefits including health insurance and leave
-• Professional development through IRC's global learning platform (RescueNet)
-• Opportunity to improve the lives of refugee communities`),
-
-  makeJob(13, "Nutrition Officer – Acute Malnutrition Response", "Nutrition", "Turkana, Kenya", "Full-time", "2026-06-01",
-    `OVERVIEW
-IRC Kenya's Nutrition programme is seeking a Nutrition Officer to manage community-based management of acute malnutrition (CMAM) activities in Turkana county. The Nutrition Officer will oversee OTP, TSFP, and IYCF-E programming delivered through health facilities and community outreach.
-
-KEY RESPONSIBILITIES
-• Implement and monitor CMAM programming (OTP, TSFP, SC) across target health facilities
-• Train and supervise community health volunteers on MUAC screening and referral
-• Conduct regular supportive supervision visits to health facilities
-• Manage nutrition supply pipeline and ensure timely ordering and delivery of therapeutic foods
-• Collect and analyse nutrition programme data including admission, default, recovery, and mortality rates
-• Prepare monthly programme reports and donor updates
-• Coordinate with WHO, UNICEF, and county health teams on nutrition response
-• Support integration of IYCF counselling into MCH services
-
-REQUIRED QUALIFICATIONS
-• Degree in Nutrition, Dietetics, Public Health, or related field
-• Minimum 3 years experience in CMAM programming in emergency or development contexts
-• Strong knowledge of community nutrition approaches and SPHERE nutrition standards
-• Good supervisory and training skills
-• Proficiency in English and Swahili
-
-WHAT WE OFFER
-• IRC salary and benefits
-• Specialised training on nutrition programming standards
-• Immersive field experience in one of Kenya's most underserved counties`),
-
-  // ── World Vision Kenya (14) ───────────────────────────────────────────────
-  makeJob(14, "Area Programme Manager", "Coordination", "Kitui, Kenya", "Full-time", "2026-05-05",
-    `OVERVIEW
-World Vision Kenya is seeking an Area Programme Manager (APM) to lead a community development programme in Kitui county. The APM will manage integrated programming across health, education, livelihoods, WASH, and child protection, working with communities, local government, and faith-based organisations.
-
-KEY RESPONSIBILITIES
-• Provide strategic and operational leadership for all programme activities in the area programme
-• Manage a multi-disciplinary team of programme officers and community facilitators
-• Oversee budget management, financial reporting, and compliance for the area programme
-• Coordinate with county government departments and local community structures
-• Ensure community participation, accountability mechanisms, and child safeguarding standards
-• Monitor programme output and outcome indicators and ensure data quality
-• Prepare donor and board reports, case studies, and programme evaluations
-• Represent World Vision in county-level coordination forums and inter-agency meetings
-
-REQUIRED QUALIFICATIONS
-• Degree in Development Studies, Community Development, Social Sciences, or related field
-• Minimum 5 years experience in NGO programme management, including staff supervision
-• Strong financial management, reporting, and donor compliance skills
-• Experience working with community-based organisations and local government
-• Excellent interpersonal, communication, and problem-solving skills
-• Valid driving licence and willingness to travel frequently
-
-WHAT WE OFFER
-• World Vision salary and benefits package
-• Commitment to staff spiritual nurture and wholistic wellbeing
-• Career development and internal promotion opportunities`),
-
-  // ── CARE International Kenya (15) ────────────────────────────────────────
-  makeJob(15, "MEAL Officer", "M&E", "Nairobi, Kenya", "Full-time", "2026-05-15",
-    `OVERVIEW
-CARE International Kenya is looking for a MEAL (Monitoring, Evaluation, Accountability and Learning) Officer to support cross-sectoral programming across CARE's Kenya portfolio. The MEAL Officer will support data collection, quality assurance, and learning documentation for health, food security, and gender programmes.
-
-KEY RESPONSIBILITIES
-• Support development and implementation of MEAL frameworks, logframes, and indicator tracking systems
-• Design and conduct programme quality assessments, post-distribution monitoring, and process evaluations
-• Train programme staff and partners on data collection tools and methodologies
-• Manage mobile data collection systems (Kobo, ODK, CommCare)
-• Conduct data analysis and produce evidence-based learning briefs and reports
-• Support establishment of Feedback and Response Mechanisms (FRM) and accountability to affected populations
-• Contribute to proposal development, baseline surveys, and end-line evaluations
-• Maintain CARE Kenya's programme database and performance dashboard
-
-REQUIRED QUALIFICATIONS
-• Degree in Statistics, Development Studies, Social Sciences, or related field
-• Minimum 3 years experience in monitoring and evaluation in NGO or UN contexts
-• Proficiency in quantitative and qualitative research methods
-• Strong skills in Kobo Toolbox, Excel, SPSS, or Stata
-• Experience in accountability to affected populations and complaints mechanisms
-• Good English and Swahili communication skills
-
-WHAT WE OFFER
-• CARE salary and benefits
-• Exposure to diverse sectors and programme modalities
-• Commitment to feminist principles and gender equality`),
-
-  // ── Action Against Hunger Kenya (16) ─────────────────────────────────────
-  makeJob(16, "Nutrition and Health Programme Manager", "Nutrition", "Mandera, Kenya", "Full-time", "2026-05-01",
-    `OVERVIEW
-Action Against Hunger Kenya is seeking a Nutrition and Health Programme Manager for Mandera county. The incumbent will manage integrated nutrition-health-WASH programming, lead a large field team, and ensure programme quality in one of Kenya's most food-insecure counties.
-
-KEY RESPONSIBILITIES
-• Manage integrated CMAM, maternal and child nutrition, and primary health care programming in Mandera
-• Supervise a team of nutrition officers, clinical officers, and health workers
-• Oversee programme budget planning, expenditure tracking, and financial reporting
-• Ensure compliance with MoH and ACF technical standards and protocols
-• Coordinate with county health management team (CHMT) and health sub-sector working group
-• Lead programme monitoring, data review, and adaptive management processes
-• Contribute to proposal development and donor reporting for ECHO, USAID, and UNICEF-funded projects
-• Ensure ACF's security protocols are adhered to in a complex security environment
-
-REQUIRED QUALIFICATIONS
-• Degree in Nutrition, Public Health, Nursing, or Medicine (advanced degree preferred)
-• Minimum 5 years experience in nutrition-health programming, including at least 2 years in management
-• Strong financial management and donor compliance skills
-• Experience working in insecure or remote field environments
-• Excellent leadership, team building, and problem-solving skills
-• Fluency in Somali is a strong asset
-
-WHAT WE OFFER
-• Competitive ACF salary and comprehensive benefits including R&R allowance
-• Security and psychosocial support for field staff
-• Career progression in a leading nutrition-focused organisation`),
-
-  // ── NRC Kenya (17) ───────────────────────────────────────────────────────
-  makeJob(17, "Information Counselling and Legal Assistance (ICLA) Officer", "Legal", "Nairobi, Kenya", "Full-time", "2026-05-20",
-    `OVERVIEW
-NRC Kenya's ICLA programme is seeking an ICLA Officer to deliver legal assistance and counselling services to refugees and asylum seekers in Nairobi. The ICLA Officer will provide individual case assistance, legal information sessions, and referrals on civil documentation, housing land and property rights, and asylum procedures.
-
-KEY RESPONSIBILITIES
-• Provide individual legal counselling and case assistance to refugees and asylum seekers
-• Facilitate legal information sessions on refugee rights, RSD procedures, and civil documentation
-• Support clients in accessing civil documentation including birth certificates, marriage certificates, and national ID cards
-• Liaise with UNHCR, the Refugee Affairs Secretariat, and courts on legal cases
-• Monitor legal and policy developments affecting refugees in Kenya
-• Maintain accurate case records in NRC's ICLA database
-• Prepare monthly programme reports and case statistics
-• Support legal needs assessments and protection monitoring activities
-
-REQUIRED QUALIFICATIONS
-• Degree in Law (LLB); admitted to the bar in Kenya an asset
-• Minimum 3 years of experience in legal aid, refugee law, or human rights work
-• Strong knowledge of Kenya's Refugees Act (2021) and international refugee law
-• Excellent interpersonal and communication skills
-• Fluency in English and Somali or Arabic an asset
-
-WHAT WE OFFER
-• NRC salary and competitive benefits
-• Professional development in refugee law and humanitarian protection
-• Supportive and inclusive team environment`),
-
-  // ── DRC Kenya (18) ────────────────────────────────────────────────────────
-  makeJob(18, "Shelter and NFI Project Officer", "Shelter", "Garissa, Kenya", "Full-time", "2026-05-25",
-    `OVERVIEW
-DRC Kenya is recruiting a Shelter and NFI Project Officer to manage shelter construction and non-food item (NFI) distribution activities in Dadaab refugee complex. The Project Officer will oversee construction quality, distribution logistics, and community engagement.
-
-KEY RESPONSIBILITIES
-• Supervise construction and rehabilitation of emergency and transitional shelter units in Dadaab
-• Manage NFI distribution activities including beneficiary verification, stock management, and distribution logistics
-• Conduct post-distribution monitoring and shelter quality assessments
-• Coordinate with UNHCR, CARE, and other shelter partners on gap analysis and joint planning
-• Manage relationships with community structures, refugee leaders, and contractors
-• Ensure compliance with SPHERE standards, DRC quality benchmarks, and donor requirements
-• Prepare technical reports, distribution reports, and monthly programme updates
-• Support proposal development with budget estimates and activity plans
-
-REQUIRED QUALIFICATIONS
-• Degree in Civil Engineering, Architecture, Construction Management, or related field
-• Minimum 3 years of shelter or construction management experience in humanitarian contexts
-• Knowledge of emergency shelter standards (SPHERE, humanitarian shelter guidelines)
-• Strong organisational, planning, and logistics management skills
-• Experience in conducting participatory community consultations
-• Good English communication skills; Somali an advantage
-
-WHAT WE OFFER
-• DRC competitive salary and benefits
-• International exposure and networking opportunities
-• Supportive and committed humanitarian team`),
-
-  // ── Mercy Corps Kenya (19) ────────────────────────────────────────────────
-  makeJob(19, "Market Systems Development Advisor", "Food Security", "Nairobi, Kenya", "Full-time", "2026-06-01",
-    `OVERVIEW
-Mercy Corps Kenya is seeking a Market Systems Development Advisor to lead market-systems-based programming for food security and economic development in the ASAL counties of northern Kenya. The Advisor will guide programme teams and partners in applying systemic change approaches.
-
-KEY RESPONSIBILITIES
-• Provide technical leadership on market systems development (M4P/Systemic change) across Mercy Corps Kenya's food security portfolio
-• Conduct market assessments, system analyses, and value chain studies
-• Design facilitative interventions to catalyse sustainable market change
-• Build capacity of programme staff and local partners on market systems approaches
-• Develop monitoring and results measurement (MRM) frameworks for market systems programmes
-• Contribute to learning and adaptation processes based on programme evidence
-• Engage with private sector actors, government, and financial service providers as market facilitators
-• Contribute to business development and proposal writing for USAID, FCDO, and EU-funded programmes
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Agricultural Economics, Development Economics, Business Administration, or related field
-• Minimum 7 years of experience in market systems development, value chains, or private sector engagement
-• Strong knowledge of Springfield Centre MSD methodology or equivalent frameworks
-• Experience in designing MRM systems for market systems programmes
-• Excellent analytical and communication skills
-
-WHAT WE OFFER
-• Mercy Corps competitive salary and comprehensive benefits
-• Organisational learning culture and team collaboration
-• Opportunity to drive systems-level change in Kenya's food economy`),
-
-  // ── Plan International Kenya (20) ─────────────────────────────────────────
-  makeJob(20, "Girls' Education Programme Officer", "Education", "Kwale, Kenya", "Full-time", "2026-05-10",
-    `OVERVIEW
-Plan International Kenya is looking for a Girls' Education Programme Officer to implement girls' education and empowerment programming in Kwale county. The officer will work with communities, schools, and county government to keep girls in school, prevent GBV, and support learning outcomes.
-
-KEY RESPONSIBILITIES
-• Implement girls' education and adolescent empowerment activities in target schools and communities
-• Coordinate with county education and gender departments
-• Train teachers, parents, and community leaders on gender-responsive teaching and child protection
-• Facilitate girls' clubs and safe spaces for adolescent girls
-• Conduct community awareness sessions on girls' education, child marriage, and FGM prevention
-• Distribute dignity kits and educational materials to girls
-• Monitor girls' attendance, retention, and learning outcomes
-• Prepare programme reports and case studies on girls' education outcomes
-
-REQUIRED QUALIFICATIONS
-• Degree in Education, Gender Studies, Social Work, or related field
-• Minimum 3 years experience in girls' education, gender, or adolescent programming
-• Experience working with community-based structures and local government
-• Good facilitation, training, and communication skills
-• Proficiency in English and Swahili; knowledge of Digo or Duruma language an asset
-
-WHAT WE OFFER
-• Plan International salary and benefits
-• Commitment to girls' rights and gender equality
-• Supportive and values-driven team`),
-
-  // ── GOAL Kenya (21) ──────────────────────────────────────────────────────
-  makeJob(21, "Urban Health Programme Manager", "Health", "Nairobi, Kenya", "Full-time", "2026-05-15",
-    `OVERVIEW
-GOAL Kenya seeks an Urban Health Programme Manager to lead health systems strengthening and community health programming in Nairobi's informal settlements. The Programme Manager will manage a multi-donor urban health portfolio targeting health facility improvement, community health volunteer systems, and disease surveillance.
-
-KEY RESPONSIBILITIES
-• Lead and manage GOAL Kenya's urban health programme across target informal settlements in Nairobi
-• Supervise programme staff including health officers, community health supervisors, and M&E staff
-• Strengthen Nairobi City County health facilities through supply chain support, quality improvement, and HR capacity building
-• Manage community health volunteer (CHV) networks and community health unit systems
-• Coordinate with Nairobi City County Health Management Team and sub-county health teams
-• Manage programme budgets and financial reporting for donor-funded grants
-• Prepare donor reports, programme evaluations, and lessons learned documents
-• Represent GOAL in urban health working groups and coordination forums
-
-REQUIRED QUALIFICATIONS
-• Degree in Public Health, Medicine, Nursing, or related health field (Master's preferred)
-• Minimum 5 years of health programme management experience, ideally in urban contexts
-• Understanding of Kenya's health system architecture and community health strategy
-• Strong financial management and donor compliance experience
-• Excellent leadership and people management skills
-
-WHAT WE OFFER
-• GOAL salary with health insurance and leave benefits
-• Opportunity to lead a high-impact urban health programme
-• Friendly and professional organisational culture`),
-
-  // ── Islamic Relief Kenya (22) ─────────────────────────────────────────────
-  makeJob(22, "Zakat and Livelihood Programme Officer", "Food Security", "Nairobi, Kenya", "Full-time", "2026-05-25",
-    `OVERVIEW
-Islamic Relief Kenya is seeking a Livelihood Programme Officer to design and implement livelihood and food security programmes for vulnerable communities in Kenya. The officer will manage Zakat-funded income generation activities, vocational training, and agricultural support.
-
-KEY RESPONSIBILITIES
-• Design and implement livelihood restoration and income generation activities for beneficiary households
-• Manage Zakat-funded emergency food assistance and distribution programmes
-• Support vocational skills training and link graduates to employment and self-employment opportunities
-• Conduct household vulnerability assessments and beneficiary targeting
-• Manage programme budgets and ensure proper donor accountability
-• Coordinate with community leaders, local government, and partner organisations
-• Prepare programme reports, case studies, and donor documentation
-• Ensure Islamic Relief's humanitarian principles and code of conduct are maintained
-
-REQUIRED QUALIFICATIONS
-• Degree in Development Studies, Agriculture, Business Administration, or related field
-• Minimum 3 years experience in livelihoods or food security programming
-• Knowledge of Islamic social finance (Zakat, Sadaqah) principles an advantage
-• Good community facilitation and partnership management skills
-• Proficiency in English and Swahili
-
-WHAT WE OFFER
-• Islamic Relief competitive salary and benefits
-• Values-driven and inclusive organisational culture
-• Opportunity to serve vulnerable communities across Kenya`),
-
-  // ── CRS Kenya (23) ────────────────────────────────────────────────────────
-  makeJob(23, "Head of Programming", "Coordination", "Nairobi, Kenya", "Full-time", "2026-04-30",
-    `OVERVIEW
-CRS Kenya is seeking an experienced Head of Programming to provide strategic leadership and oversight of all CRS Kenya programme operations. The HoP will manage a team of technical leads, ensure programme quality, and represent CRS Kenya with donors, government, and partners.
-
-KEY RESPONSIBILITIES
-• Provide strategic leadership and oversight of CRS Kenya's health, agriculture, emergency response, and education programmes
-• Ensure programme quality, coherence, and integration across CRS Kenya's portfolio
-• Lead resource mobilization including proposal development for USAID, EU, and private donors
-• Represent CRS Kenya in national coordination forums, donor meetings, and government engagements
-• Manage and develop a senior team of programme technical leads and managers
-• Ensure compliance with CRS programme quality standards and donor requirements
-• Lead annual country programme planning processes
-• Collaborate with finance, operations, and HR departments to ensure programmatic effectiveness
-
-REQUIRED QUALIFICATIONS
-• Master's degree in Development Studies, International Development, Public Health, or related field
-• Minimum 10 years of progressive programme management experience in international development or humanitarian settings
-• Demonstrated experience in resource mobilization and donor relationship management (USAID, FCDO, EU)
-• Strong leadership, strategic thinking, and team development skills
-• Excellent written and oral communication skills in English
-• Commitment to Catholic social teaching principles
-
-WHAT WE OFFER
-• CRS competitive salary and comprehensive benefits
-• Senior leadership role in a respected and growing organisation
-• Strong organisational commitment to staff development`),
-
-  // ── Tearfund Kenya (24) ───────────────────────────────────────────────────
-  makeJob(24, "Climate Resilience Programme Officer", "Coordination", "Kitui, Kenya", "Full-time", "2026-05-30",
-    `OVERVIEW
-Tearfund Kenya is looking for a Climate Resilience Programme Officer to implement climate adaptation and disaster risk reduction programming in Kitui county. The officer will work with local church partners, community groups, and county government to build community resilience to climate shocks.
-
-KEY RESPONSIBILITIES
-• Implement Tearfund's Umoja and community resilience programming in target communities
-• Facilitate community-based disaster risk reduction (DRR) assessments and planning
-• Support communities in developing and implementing community climate adaptation plans
-• Train local church partners and community volunteers on DRR, WASH, and resilient livelihoods
-• Coordinate farmer field schools on climate-smart agricultural practices
-• Monitor programme activities and collect data against indicators
-• Prepare programme reports and document learning from the community resilience approach
-• Engage with county government on DRR policy and mainstreaming
-
-REQUIRED QUALIFICATIONS
-• Degree in Environmental Science, Community Development, Agriculture, or related field
-• Minimum 3 years experience in DRR, climate adaptation, or rural development programming
-• Knowledge of participatory community development approaches
-• Experience working through local church or faith-based partners
-• Good Swahili and English communication skills; Kamba language an advantage
-
-WHAT WE OFFER
-• Tearfund competitive salary and benefits
-• Faith-based and values-driven organisational culture
-• Supportive team committed to community empowerment`),
-
-  // ── AMREF Kenya (25) ──────────────────────────────────────────────────────
-  makeJob(25, "Health Systems Strengthening Specialist", "Health", "Nairobi, Kenya", "Full-time", "2026-05-20",
-    `OVERVIEW
-AMREF Health Africa Kenya is recruiting a Health Systems Strengthening (HSS) Specialist to lead capacity building and quality improvement initiatives with county health management teams. The Specialist will work across AMREF's Kenya portfolio to strengthen health governance, health information systems, and health workforce performance.
-
-KEY RESPONSIBILITIES
-• Design and implement health systems strengthening interventions with County Health Management Teams (CHMTs)
-• Provide technical support on health governance, planning, and coordination at county level
-• Strengthen county health management information systems (DHIS2) and data quality
-• Lead capacity development of health facility management teams on quality improvement (QI) approaches
-• Support development of County Integrated Development Plans (CIDPs) health components
-• Coordinate with MoH, USAID, and other HSS partners on health system investments
-• Conduct systems assessments using WHO health system building blocks framework
-• Prepare technical reports, publications, and presentations
-
-REQUIRED QUALIFICATIONS
-• Advanced degree in Public Health, Health Policy and Management, or related field
-• Minimum 7 years experience in health systems strengthening, ideally in Kenya
-• Strong understanding of Kenya's devolved health system and County health structures
-• Experience in quality improvement methodologies and health governance approaches
-• Proficiency in DHIS2 and other health information systems
-• Excellent analytical and communication skills
-
-WHAT WE OFFER
-• AMREF competitive salary and benefits
-• Opportunity to shape Kenya's health system at scale
-• Africa-led, Africa-based professional environment`),
-
-  // ── Kenya Red Cross (26) ──────────────────────────────────────────────────
-  makeJob(26, "Disaster Risk Reduction Officer", "Coordination", "Nairobi, Kenya", "Full-time", "2026-06-10",
-    `OVERVIEW
-Kenya Red Cross Society is looking for a Disaster Risk Reduction (DRR) Officer to support community resilience programming across KRCS's branch network. The DRR Officer will facilitate community vulnerability and capacity assessments, train volunteers, and coordinate with county governments on disaster preparedness planning.
-
-KEY RESPONSIBILITIES
-• Facilitate community vulnerability and capacity assessments (VCA) in target communities
-• Train KRCS branch volunteers and community disaster response teams (CDRTs) on DRR approaches
-• Support communities in developing community disaster preparedness plans
-• Coordinate with county governments and National Disaster Operations Centre on disaster preparedness
-• Monitor and support implementation of DRR activities across KRCS branches
-• Document and share lessons learned from KRCS's community resilience programming
-• Represent KRCS in DRR coordination forums and working groups
-• Prepare programme reports and donor updates
-
-REQUIRED QUALIFICATIONS
-• Degree in Disaster Management, Community Development, Social Sciences, or related field
-• Minimum 3 years experience in DRR, emergency preparedness, or community development
-• Knowledge of Red Cross Red Crescent Movement principles and volunteer management
-• Strong facilitation and training skills
-• Excellent community engagement and communication skills
-• Valid driving licence and willingness to travel across Kenya
-
-WHAT WE OFFER
-• KRCS salary and benefits
-• Engagement with the global Red Cross Red Crescent network
-• Contribution to Kenya's humanitarian preparedness`),
-
-  // ── Concern Worldwide Kenya (27) ──────────────────────────────────────────
-  makeJob(27, "Nutrition Manager", "Nutrition", "Samburu, Kenya", "Full-time", "2026-05-15",
-    `OVERVIEW
-Concern Worldwide Kenya is recruiting a Nutrition Manager for Samburu county to lead integrated nutrition programming including CMAM, MIYCN, and multi-sector nutrition integration with WASH and food security programmes.
-
-KEY RESPONSIBILITIES
-• Lead design, implementation, and monitoring of integrated nutrition programmes in Samburu
-• Manage and supervise a team of nutrition officers, community health workers, and enumerators
-• Oversee CMAM programme including OTP, TSFP, and Stabilisation Centre linkage
-• Lead implementation of Mother, Infant and Young Child Nutrition (MIYCN) interventions
-• Coordinate with MoH Samburu County Health Department and sub-county nutrition focal persons
-• Manage programme budgets and donor financial reporting
-• Conduct SMART surveys and programme evaluations
-• Represent Concern in nutrition sub-sector working groups and inter-agency forums
-
-REQUIRED QUALIFICATIONS
-• Degree in Nutrition, Public Health, or related field (Master's preferred)
-• Minimum 5 years of nutrition programme management experience including CMAM
-• Strong skills in SMART surveys, ENA for SMART, and nutrition data analysis
-• Experience in MIYCN programming and community mobilisation
-• Strong leadership and team management abilities
-• Good English and Swahili; Samburu language an asset
-
-WHAT WE OFFER
-• Concern Worldwide salary and comprehensive benefits including R&R
-• Professional development and international exposure
-• Opportunity to lead nutrition programming in a priority county`),
-
-  // ── Africa Humanitarian Action (28) ──────────────────────────────────────
-  makeJob(28, "Emergency Health Coordinator", "Health", "Nairobi, Kenya", "Full-time", "2026-06-01",
-    `OVERVIEW
-Africa Humanitarian Action (AHA) is seeking an Emergency Health Coordinator to lead health emergency response operations in Kenya. The Emergency Health Coordinator will manage rapid response deployments, health cluster coordination, and AHA's emergency medical teams in disease outbreaks and disaster-affected areas.
-
-KEY RESPONSIBILITIES
-• Coordinate AHA's health emergency response operations in Kenya
-• Lead deployment of Emergency Medical Teams (EMT) and community health workers during emergencies
-• Manage health cluster coordination and inter-agency response planning
-• Oversee disease outbreak response including cholera, measles, and meningitis
-• Develop emergency health response plans and standard operating procedures
-• Manage emergency response budgets and logistics
-• Prepare situation reports, donor proposals, and after-action reviews
-• Represent AHA in health cluster, WHO, and government emergency coordination structures
-
-REQUIRED QUALIFICATIONS
-• Medical degree (MBChB or equivalent); Master's in Public Health preferred
-• Minimum 5 years experience in emergency health response and health coordination
-• Experience with Emergency Medical Team (EMT) systems and WHO EMT standards
-• Strong programme management and donor reporting skills
-• Excellent leadership and communication skills under pressure
-
-WHAT WE OFFER
-• AHA competitive salary reflecting African leadership values
-• Unique role in Africa-led humanitarian health response
-• Career development in a growing African humanitarian organisation`),
-
-  // ── Welthungerhilfe Kenya (29) ────────────────────────────────────────────
-  makeJob(29, "WASH Engineer", "WASH", "Kilifi, Kenya", "Full-time", "2026-05-30",
-    `OVERVIEW
-Welthungerhilfe Kenya is looking for a WASH Engineer for Kilifi county to design, supervise, and manage water supply and sanitation infrastructure projects in rural coastal communities. The WASH Engineer will oversee construction quality, community water management systems, and hygiene promotion integration.
-
-KEY RESPONSIBILITIES
-• Design and prepare Bills of Quantities (BoQs) and engineering drawings for water supply and sanitation infrastructure
-• Supervise construction of boreholes, piped water systems, water kiosks, and sanitation facilities
-• Manage contractors and ensure construction quality and adherence to specifications
-• Facilitate establishment and capacity building of community water management committees
-• Coordinate with county WASH department and other WASH implementing partners
-• Conduct water quality testing and develop action plans to address contamination
-• Prepare technical engineering reports, construction completion certificates, and progress updates
-• Support integration of hygiene promotion into WASH infrastructure programming
-
-REQUIRED QUALIFICATIONS
-• Degree in Civil Engineering, Water Engineering, or Environmental Engineering
-• Minimum 3 years experience in WASH infrastructure programming in development or humanitarian settings
-• Knowledge of borehole hydrogeology, water system design, and sanitation technology
-• Experience in community-based water management and CLTS approaches
-• Proficiency in AutoCAD or other engineering design software
-• Valid driving licence
-
-WHAT WE OFFER
-• Welthungerhilfe competitive salary and benefits
-• Hands-on engineering and development experience in coastal Kenya
-• Supportive German-standard organisational management`),
-];
-
+function buildDescription(sector: string, title: string, orgName: string, location: string): string {
+  const templates = DESC[sector] || DESC["Other"];
+  const tpl = templates[Math.floor(seededRand() * templates.length)];
+  return tpl;
+}
+
+function generateJobsForOrg(orgId: string, org: OrgDef, count: number) {
+  const jobs: any[] = [];
+  const usedCombos = new Set<string>();
+
+  let i = 0;
+  let attempts = 0;
+  while (i < count && attempts < count * 10) {
+    attempts++;
+    const sector = pick(org.sectors);
+    const roleList = ROLES[sector] || ROLES["Other"];
+    const title = pick(roleList);
+    const combo = `${sector}::${title}`;
+    if (usedCombos.has(combo)) continue;
+    usedCombos.add(combo);
+
+    const region = pick(org.regions);
+    const locationPool = LOC[region] || LOC["Global"];
+    const location = pick(locationPool);
+    const empType = pick(EMP);
+    const deadline = futureDate(45, 180);
+    const description = buildDescription(sector, title, org.name, location);
+
+    jobs.push({
+      title,
+      description,
+      organization_id: orgId,
+      sector,
+      location,
+      employment_type: empType,
+      deadline,
+      is_active: true,
+    });
+    i++;
+  }
+  return jobs;
+}
+
+// ── MAIN SEED ─────────────────────────────────────────────────────────────────
 async function seed() {
-  console.log("🌱 Seeding organizations...");
+  console.log("🌱 Clearing existing data...");
+  await db.execute(sql`TRUNCATE jobs, applications, documents RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE organizations RESTART IDENTITY CASCADE`);
 
-  // Clear existing data
-  await db.delete(jobsTable);
-  await db.delete(organizationsTable);
-
-  // Insert organizations
+  console.log("🏢 Seeding 120 organizations...");
   const insertedOrgs = await db
     .insert(organizationsTable)
     .values(
-      organizations.map((org) => ({
-        name: org.name,
-        description: org.description,
-        logo_url: org.logo_url,
-        website: org.website,
-        type: org.type,
+      ORGS.map((o) => ({
+        name: o.name,
+        description: o.description,
+        logo_url: null,
+        website: o.website,
+        type: o.type,
       }))
     )
     .returning();
-
   console.log(`✅ Inserted ${insertedOrgs.length} organizations`);
 
-  // Insert jobs
-  const jobsToInsert = jobTemplates.map((job) => ({
-    title: job.title,
-    description: job.description,
-    organization_id: insertedOrgs[job.organizationIndex].id,
-    sector: job.sector,
-    location: job.location,
-    employment_type: job.employment_type,
-    deadline: job.deadline,
-    is_active: true,
-  }));
+  console.log("💼 Generating jobs...");
+  const allJobs: any[] = [];
+  for (let i = 0; i < insertedOrgs.length; i++) {
+    const org = ORGS[i];
+    const dbOrg = insertedOrgs[i];
+    // UN agencies get 17 jobs, major INGOs get 16, rest get 14
+    const count = org.type === "UN" ? 17 : org.type === "INGO" ? 16 : 14;
+    const jobs = generateJobsForOrg(dbOrg.id, org, count);
+    allJobs.push(...jobs);
+  }
 
-  const insertedJobs = await db.insert(jobsTable).values(jobsToInsert).returning();
+  console.log(`📦 Inserting ${allJobs.length} jobs in batches...`);
+  const BATCH = 200;
+  for (let i = 0; i < allJobs.length; i += BATCH) {
+    await db.insert(jobsTable).values(allJobs.slice(i, i + BATCH));
+    process.stdout.write(`   ${Math.min(i + BATCH, allJobs.length)}/${allJobs.length} jobs inserted\r`);
+  }
 
-  console.log(`✅ Inserted ${insertedJobs.length} jobs`);
-  console.log("\n🎉 Seeding complete!");
-  console.log(`   Organizations: ${insertedOrgs.length}`);
-  console.log(`   Jobs: ${insertedJobs.length}`);
-
+  console.log(`\n\n🎉 Seed complete!`);
+  console.log(`   Organizations : ${insertedOrgs.length}`);
+  console.log(`   Jobs          : ${allJobs.length}`);
   process.exit(0);
 }
 
