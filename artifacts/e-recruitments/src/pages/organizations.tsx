@@ -1,8 +1,9 @@
 import { useListOrganizations } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
-import { Building, Globe, ExternalLink, Loader2 } from "lucide-react";
+import { Globe, ExternalLink, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { OrgAvatar } from "@/components/org-avatar";
 
 export function Organizations() {
   const { data: orgs, isLoading } = useListOrganizations();
@@ -29,16 +30,14 @@ export function Organizations() {
               transition={{ delay: i * 0.1 }}
             >
               <Card className="h-full flex flex-col p-8 border-slate-200 hover:shadow-xl transition-all duration-300 rounded-3xl bg-white group">
-                <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.name} className="w-10 h-10 object-contain" />
-                  ) : (
-                    <Building className="w-8 h-8 text-slate-400" />
-                  )}
+                <div className="mb-6 group-hover:scale-110 transition-transform self-start">
+                  <OrgAvatar name={org.name} logoUrl={org.logo_url} size="lg" />
                 </div>
-                
-                <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider rounded-full self-start mb-4">
-                  {org.type}
+
+                <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full self-start mb-4 ${
+                  org.type === "UN" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+                }`}>
+                  {org.type === "UN" ? "UN Agency" : "NGO"}
                 </span>
                 
                 <h3 className="text-2xl font-display font-bold text-slate-900 mb-3">{org.name}</h3>
