@@ -1,3 +1,4 @@
+import { useSEO } from "@/hooks/use-seo";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,11 @@ const CV_TIPS = [
 ];
 
 export function HowToApply() {
+  useSEO({
+    title: "How to Apply — UN & NGO Hiring Guide",
+    description: "Step-by-step guide to applying for UN, NGO and INGO jobs. Learn the 6-step UN hiring process, UN grade system (G, P, D levels), STAR interview method, and CV tips.",
+    canonical: "https://erecruitments1.vercel.app/how-to-apply",
+  });
   return (
     <div className="w-full">
       {/* Hero */}

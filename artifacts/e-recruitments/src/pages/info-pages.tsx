@@ -1,7 +1,9 @@
+import { useSEO } from "@/hooks/use-seo";
 import { Mail, MapPin, Phone, Shield, FileText, AlertTriangle, Globe, Target, Heart, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export function About() {
+  useSEO({ title: "About Us", description: "Learn about E-RECRUITMENTS — the leading platform connecting professionals with UN, NGO and INGO career opportunities across 190+ countries worldwide." });
   return (
     <div className="max-w-4xl mx-auto px-4 py-16">
       <h1 className="text-4xl md:text-5xl font-display font-bold text-slate-900 mb-8 text-center">About Us</h1>
@@ -65,6 +67,7 @@ export function About() {
 }
 
 export function Contact() {
+  useSEO({ title: "Contact Us", description: "Get in touch with the E-RECRUITMENTS team. We're here to help with your international job search and recruitment needs." });
   return (
     <div className="max-w-4xl mx-auto px-4 py-16">
       <h1 className="text-4xl md:text-5xl font-display font-bold text-slate-900 mb-6 text-center">Contact Us</h1>
@@ -133,6 +136,7 @@ export function Contact() {
 }
 
 export function Privacy() {
+  useSEO({ title: "Privacy Policy", description: "E-RECRUITMENTS privacy policy — how we collect, use, and protect your personal data." });
   return (
     <div className="max-w-3xl mx-auto px-4 py-16">
       <div className="flex items-center gap-3 mb-6">
@@ -211,6 +215,7 @@ export function Privacy() {
 }
 
 export function Terms() {
+  useSEO({ title: "Terms of Service", description: "E-RECRUITMENTS terms of service — the rules and guidelines for using our international jobs platform." });
   return (
     <div className="max-w-3xl mx-auto px-4 py-16">
       <div className="flex items-center gap-3 mb-6">
@@ -285,6 +290,7 @@ export function Terms() {
 }
 
 export function Disclaimer() {
+  useSEO({ title: "Disclaimer", description: "E-RECRUITMENTS disclaimer — important information about our recruitment platform, job listings, and fraud prevention." });
   return (
     <div className="max-w-3xl mx-auto px-4 py-16">
       <div className="flex items-center gap-3 mb-6">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSEO } from "@/hooks/use-seo";
 import { Link, useLocation } from "wouter";
 import { useListJobs, useListOrganizations } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,6 +33,11 @@ const SECTOR_COLORS: Record<string, string> = {
 };
 
 export function Jobs() {
+  useSEO({
+    title: "Browse International Jobs",
+    description: "Search 1,850+ UN, NGO and INGO vacancies across 190+ countries. Filter by sector, organization, and location to find your perfect international development role.",
+    canonical: "https://erecruitments1.vercel.app/jobs",
+  });
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("all");
   const [orgId, setOrgId] = useState("all");

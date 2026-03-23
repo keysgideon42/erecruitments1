@@ -1,3 +1,4 @@
+import { useSEO } from "@/hooks/use-seo";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useListJobs } from "@workspace/api-client-react";
@@ -55,6 +56,11 @@ const UN_AGENCIES_PREVIEW = [
 ];
 
 export function Home() {
+  useSEO({
+    title: "Home",
+    description: "Discover 1,850+ UN, NGO and INGO career opportunities across 190+ countries. Browse international development, humanitarian, and peacekeeping jobs from 120+ top global organizations.",
+    canonical: "https://erecruitments1.vercel.app/",
+  });
   const { data: jobs, isLoading: jobsLoading } = useListJobs({ search: "" });
   const { data: orgs } = useListOrganizations();
   const recentJobs = jobs?.slice(0, 6) || [];

@@ -1,3 +1,4 @@
+import { useSEO } from "@/hooks/use-seo";
 import { useListOrganizations } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Globe, ExternalLink, Loader2 } from "lucide-react";
@@ -6,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { OrgAvatar } from "@/components/org-avatar";
 
 export function Organizations() {
+  useSEO({
+    title: "Partner Organizations",
+    description: "Explore 120+ leading UN agencies, INGOs, bilateral donors and regional organizations posting jobs on E-RECRUITMENTS — including UNICEF, UNDP, WHO, Oxfam, MSF and more.",
+    canonical: "https://erecruitments1.vercel.app/organizations",
+  });
   const { data: orgs, isLoading } = useListOrganizations();
 
   return (

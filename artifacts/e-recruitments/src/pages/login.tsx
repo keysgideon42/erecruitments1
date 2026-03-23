@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useSEO } from "@/hooks/use-seo";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,11 @@ import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export function Login() {
+  useSEO({
+    title: "Sign In — Apply for UN & NGO Jobs",
+    description: "Sign in or create an account on E-RECRUITMENTS to apply for UN, NGO and INGO jobs worldwide.",
+    canonical: "https://erecruitments1.vercel.app/login",
+  });
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

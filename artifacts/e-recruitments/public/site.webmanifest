@@ -1,0 +1,17 @@
+{
+  "name": "E-RECRUITMENTS — UN & NGO Jobs",
+  "short_name": "E-RECRUITMENTS",
+  "description": "The leading platform for UN, NGO, and INGO career opportunities worldwide. Browse 1,850+ international development jobs across 190+ countries.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f2744",
+  "theme_color": "#0f2744",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
